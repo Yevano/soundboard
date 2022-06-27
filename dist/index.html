@@ -1,11 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <script lang="js" src="./index.js"></script>
+    <!-- <script>var exports = {};</script> -->
+    <script src="./index.js"></script>
     <link rel="stylesheet" href="./index.css">
 </head>
 <body>
-    <input type="range" min="1" max="100" value="50" class="slider" id="volume-slider">
+    <div class="main-controls">
+        <input type="range" min="1" max="100" value="50" class="slider" id="volume-slider">
+        <button class="audio-button" id="play-button">Play all</button>
+        <button class="audio-button" id="stop-button">Stop all</button>
+    </div>
     <div id="control-container"  />
 </body>
 </html>

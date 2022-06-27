@@ -1,3 +1,6 @@
+import { dom } from "./dom"
+import { sleep } from "./util"
+
 const audioFiles = [
     'Laugh Track',
     'Nice',
@@ -55,7 +58,6 @@ const audioFiles = [
     'Id fight a homeless guy',
     'Yeah',
     'Youre gaslighting me',
-    'Nonononono',
     'NOOOOOOO',
     'Is mayo an instrument',
     'My penis wenis',
@@ -72,7 +74,10 @@ const audioFiles = [
     'GBA',
 ]
 
-let audioSliderElement: HTMLInputElement
+const controlContainerRef = dom.ref<HTMLDivElement>('control-container')
+const audioSliderRef = dom.ref<HTMLInputElement>('volume-slider')
+const playAllRef = dom.ref<HTMLButtonElement>('play-button')
+const stopAllRef = dom.ref<HTMLButtonElement>('stop-button')
 
 type AudioControl = { buttonElement: HTMLButtonElement, audioElement: HTMLAudioElement }
 
@@ -103,7 +108,7 @@ function createAudioButton(name: string, audioElement: HTMLAudioElement) {
     //buttonElement.setAttribute('pressed', '')
     let currentlyPlaying = false
     buttonElement.innerHTML = name
-    buttonElement.onclick = event => {
+    buttonElement.onclick = async event => {
         const isShift = event.shiftKey
         if (isShift) {
             audioElement.currentTime = 0
@@ -111,7 +116,8 @@ function createAudioButton(name: string, audioElement: HTMLAudioElement) {
         } else {
             audioElement.currentTime = 0
             if (!currentlyPlaying) {
-                audioElement.volume = Number.parseInt(audioSliderElement.value) / 100
+                const audioSlider = await audioSliderRef.get()
+                audioElement.volume = Number.parseInt(audioSlider.value) / 100
                 audioElement.play()
             }
         }
@@ -121,9 +127,7 @@ function createAudioButton(name: string, audioElement: HTMLAudioElement) {
 }
 
 function addSound(controlContainer: HTMLElement, name: string) {
-    /** @type HTMLAudioElement */
     let audioElement = document.createElement('audio')
-    // audioElement.setAttribute('controls', true)
     audioElement.setAttribute('src', `../audio/${name}.mp3`)
     controlContainer.appendChild(audioElement)
     
@@ -143,29 +147,54 @@ function addSound(controlContainer: HTMLElement, name: string) {
     }
 }
 
-function updateVolume() {
+async function updateVolume() {
     for (const { audioElement } of audioControls) {
-        audioElement.volume = Number.parseInt(audioSliderElement.value) / 100
+        const audioSlider = await audioSliderRef.get()
+        audioElement.volume = Number.parseInt(audioSlider.value) / 100
     }
 }
 
-function initAudioSlider() {
+async function initAudioSlider() {
+    let audioSliderElement = await audioSliderRef.get()
     audioSliderElement = document.getElementById('volume-slider') as HTMLInputElement
 
-    updateVolume()
-    audioSliderElement.onchange = event => {
-        updateVolume()
+    await updateVolume()
+    audioSliderElement.onchange = async event => {
+        await updateVolume()
     }
 }
 
-function onContentLoaded(event: any) {
-    let controlContainer = document.getElementById('control-container') as HTMLElement
+async function playAll() {
+    for (const control of audioControls) {
+        await sleep(50)
+        control.audioElement.currentTime = 0
+        control.audioElement.play()
+    }
+}
 
+async function stopAll() {
+    for (const control of audioControls) {
+        control.audioElement.pause()
+        control.audioElement.currentTime = 0
+    }
+}
+
+async function start() {
     for (const name of audioFiles) {
-        addSound(controlContainer, name)
+        addSound(await controlContainerRef.get(), name)
     }
 
-    initAudioSlider()
+    await initAudioSlider()
+
+    const playAllButton = await playAllRef.get()
+    playAllButton.onclick = () => {
+        playAll()
+    }
+
+    const stopAllButton = await stopAllRef.get()
+    stopAllButton.onclick = () => {
+        stopAll()
+    }
 }
 
-window.addEventListener('DOMContentLoaded', onContentLoaded);
+start()
