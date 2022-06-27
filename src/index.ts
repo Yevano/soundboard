@@ -164,15 +164,22 @@ async function initAudioSlider() {
     }
 }
 
+let shouldStopPlayingAll = false
+
 async function playAll() {
     for (const control of audioControls) {
         await sleep(50)
+        if (shouldStopPlayingAll) {
+            shouldStopPlayingAll = false
+            return
+        }
         control.audioElement.currentTime = 0
         control.audioElement.play()
     }
 }
 
 async function stopAll() {
+    shouldStopPlayingAll = true
     for (const control of audioControls) {
         control.audioElement.pause()
         control.audioElement.currentTime = 0
