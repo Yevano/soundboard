@@ -1,78 +1,131 @@
 import { dom } from "./dom"
-import { sleep } from "./util"
+import { Dictionary, sleep } from "./util"
 
-const audioFiles = [
-    'Laugh Track',
-    'Nice',
-    'FBI open up',
-    'Windows 95 Error',
-    'Disgusting',
-    'Michaels birthday',
-    'Pause the movie',
-    'Witness the power',
-    'Peep the horror',
-    'It was dead quiet',
-    'Gay frogs',
-    'Sick of this crap',
-    'Im a human and im comin',
-    'Im a pioneer',
-    'My heart is big',
-    'They ask you if you are fine',
-    'Wet ass p word',
-    'Whores in this house',
-    'Spit in my mouth',
-    'This is in real time',
-    'Visual Basic',
-    'Police Siren 1',
-    'Police Siren 2',
-    'Why are you running',
-    'The missile knows',
-    'Sand',
-    'Hip young crowd',
-    'Bet on it',
-    'How could this happen to me',
-    'You have a lovely kidney',
-    'I am the chosen one',
-    'You are fake news',
-    'Its very sad',
-    'Big massive dumps',
-    'We Love You',
-    'Noot',
-    'Gun shot 1',
-    'Machine gun 1',
-    'Scott Bradford',
-    'I am here squandering my life away',
-    'Suboptimal',
-    'It turned into apples',
-    'Please end my suffering',
-    'I am the law',
-    'I am a wolf',
-    'Microsoft Heisenberg',
-    'George Bush doesnt care about black people',
-    'E',
-    'Lets do the fork in the garbage disposal',
-    'STOP',
-    'I have so far to go',
-    'You bet your sweet bippy I did',
-    'Vindows R',
-    'Id fight a homeless guy',
-    'Yeah',
-    'Youre gaslighting me',
-    'NOOOOOOO',
-    'Is mayo an instrument',
-    'My penis wenis',
-    'Congrats on the penis',
-    'Onii-chan',
-    'Oops',
-    'JPEG',
-    'Bwah',
-    'We got him',
-    'Elements of bathrooms',
-    'Hey nonbinary hoes',
-    'Clubbed to death',
-    'Monster Mashturbate',
-    'GBA',
-]
+const audioFiles: Dictionary<string[]> = {
+    'SFX': [
+        'Laugh Track',
+        'Windows 95 Error',
+        'Gun shot 1',
+        'Machine gun 1',
+        'Police Siren 1',
+        'Police Siren 2',
+        'GBA',
+        'Noot',
+    ],
+
+    'Music': [
+        'Bet on it',
+        'Michaels birthday',
+        'How could this happen to me',
+        'Please end my suffering',
+        'E',
+        'Lets do the fork in the garbage disposal',
+        'STOP',
+        'I have so far to go',
+        'Clubbed to death',
+        'Monster Mashturbate',
+    ],
+
+    'Memes': [
+        'Among Us',
+        'Nice',
+        'Disgusting',
+        'They ask you if you are fine',
+        'This is in real time',
+        'Visual Basic',
+        'Why are you running',
+        'The missile knows',
+        'Scott Bradford',
+        'It turned into apples',
+        'I am a wolf',
+        'Microsoft Heisenberg',
+        'You bet your sweet bippy I did',
+        'Is mayo an instrument',
+        'JPEG',
+        'Bwah',
+    ],
+
+    'Quotes': [
+        'trumpgender',
+        'George Bush doesnt care about black people',
+        'Gay frogs',
+        'Sick of this crap',
+        'Im a human and im comin',
+        'Im a pioneer',
+        'My heart is big',
+        'Wet ass p word',
+        'Whores in this house',
+        'Spit in my mouth',
+        'We got him',
+        'You have a lovely kidney',
+        'I am the chosen one',
+        'You are fake news',
+        'Its very sad',
+        'Big massive dumps',
+        'We Love You',
+        'I am here squandering my life away',
+        'Suboptimal',
+        'Vindows R',
+        'Id fight a homeless guy',
+        'Yeah',
+        'Youre gaslighting me',
+        'Elements of bathrooms',
+    ],
+
+    'Clips': [
+        'FBI open up',
+        'Witness the power',
+        'It was dead quiet',
+        'Pause the movie',
+        'Peep the horror',
+        'Sand',
+        'Hip young crowd',
+        'I am the law',
+        'NOOOOOOO',
+        'My penis wenis',
+        'Congrats on the penis',
+        'Onii-chan',
+        'Oops',
+        'Hey nonbinary hoes',
+    ],
+
+    'Friends': [
+        'Dont forget to bring a towel',
+        'Eww',
+        'Exactly how I would have',
+        'Fuck the straights',
+        'Fucking gross',
+        'He just wrote an HTML program',
+        'Hydrate yourself',
+        'I think it was Yevano',
+        'Im gonna take a bong hit',
+        'It was you bitch',
+        'Kayla Bigger person',
+        'Kayla That feels like a self report',
+        'Kayla Yeah',
+        'Michael Are you a scorpio',
+        'Michael Ass',
+        'Michael Cya later',
+        'Michael Life is like a hurricane',
+        'Michael Nice',
+        'Michael Wtf',
+        'Michael gay bar',
+        'Michael youll have to tell me',
+        'No',
+        'Nononononono',
+        'Oh baby',
+        'Only galaxy brain people',
+        'V Alright',
+        'V God dammit',
+        'V Guys Im drunk',
+        'V Idk what that means',
+        'V We love you',
+        'Wdym ur not awesome',
+        'Yeah he can go die',
+        'Your space your area',
+        'Youre dead',
+    ]
+}
 
 const controlContainerRef = dom.ref<HTMLDivElement>('control-container')
 const audioSliderRef = dom.ref<HTMLInputElement>('volume-slider')
@@ -107,7 +160,9 @@ function createAudioButton(name: string, audioElement: HTMLAudioElement) {
     buttonElement.className = 'audio-button'
     //buttonElement.setAttribute('pressed', '')
     let currentlyPlaying = false
-    buttonElement.innerHTML = name
+    const buttonTitleElement = document.createElement('p')
+    buttonTitleElement.textContent = name
+    buttonElement.appendChild(buttonTitleElement)
     buttonElement.onclick = async event => {
         const isShift = event.shiftKey
         if (isShift) {
@@ -186,9 +241,40 @@ async function stopAll() {
     }
 }
 
+function* audioFilesIter() {
+    for (const category in audioFiles) {
+        for (const fileName of audioFiles[category]) {
+            yield { category, fileName }
+        }
+    }
+}
+
+function* categoriesIter() {
+    for (const category in audioFiles) {
+        yield category
+    }
+}
+
 async function start() {
-    for (const name of audioFiles) {
-        addSound(await controlContainerRef.get(), name)
+    const categories = Array.from(categoriesIter())
+    const audioEntries = Array.from(audioFilesIter())
+
+    const controlContainer = await controlContainerRef.get()
+    controlContainer.style.gridTemplateColumns = `repeat(${categories.length}, ${100 / categories.length}%)`
+
+    for (const category in audioFiles) {
+        const container = document.createElement('div')
+        container.className = 'category-column'
+        const columnTitleElement = document.createElement('p')
+        columnTitleElement.textContent = category
+        columnTitleElement.className = 'column-title'
+        container.appendChild(columnTitleElement)
+
+        controlContainer.appendChild(container)
+
+        for (const name of audioFiles[category]) {
+            addSound(container, name)
+        }
     }
 
     await initAudioSlider()

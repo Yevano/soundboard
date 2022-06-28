@@ -1,9 +1,14 @@
 div#control-container {
-    display: flex;
-    flex-flow: row wrap;
-    width: 1440px;
+    display: grid;
+    /* flex-flow: row wrap; */
+    /* width: 100%; */
+    width: 1700px;
     height: 100%;
     gap: 1em;
+}
+
+p {
+    font-family: 'Courier New', Courier, monospace;
 }
 
 body {
@@ -15,8 +20,37 @@ body {
     padding-left: 4em;
 }
 
+.main-controls {
+    display: flex;
+    flex-direction: row;
+    margin-bottom: 2em;
+    align-items: center;
+    gap: 1em;
+}
+
+.category-column {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 2em repeat(100, 3em);
+    gap: 0.5em;
+    /* gap: 1em; */
+    /* width: 12em; */
+}
+
+.category-column *:first-child {
+    grid-column: 1 / 3;
+}
+
+.category-column .audio-button {
+    /* width: 5em; */
+    /* justify-self: stretch; */
+    /* width: 100%; */
+    /* width: 50%; */
+    width: 10em;
+}
+
 .audio-button {
-    border: 0px solid black;
+    border: 1px solid black;
     border-radius: 10px;
     padding: 1em;
     color: black;
@@ -24,13 +58,18 @@ body {
 }
 
 .audio-button:not([playing]) {
-    background-color: #6cb370;
+    background-color: #a0f0bb;
 }
 
-.main-controls {
-    display: flex;
-    flex-direction: row;
-    margin-bottom: 2em;
-    gap: 1em;
-    align-items: center;
+.audio-button p {
+    min-width: 0;
+    margin: 0;
+    white-space: nowrap;
+    text-overflow: ellipsis ellipsis;
+    overflow: hidden;
+    text-align: center;
+}
+
+.column-title {
+    color: white;
 }
