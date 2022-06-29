@@ -42,10 +42,6 @@ body {
 }
 
 .category-column .audio-button {
-    /* width: 5em; */
-    /* justify-self: stretch; */
-    /* width: 100%; */
-    /* width: 50%; */
     width: 10em;
     padding: 0;
     padding-left: 0.5em;
@@ -62,6 +58,10 @@ body {
 
 .audio-button:not([playing]) {
     background-color: #a0f0bb;
+}
+
+.audio-button.loop-mode[active] {
+    filter: brightness(150%);
 }
 
 .audio-button p {
