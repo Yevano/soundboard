@@ -1,3 +1,4 @@
+import { audio } from "./audio"
 import { dom } from "./dom"
 import { Dictionary, sleep } from "./util"
 
@@ -11,6 +12,8 @@ const audioFiles: Dictionary<string[]> = {
         'Police Siren 2',
         'GBA',
         'Noot',
+        'Body Reported',
+        'Emergency Meeting',
     ],
 
     'Music': [
@@ -87,6 +90,9 @@ const audioFiles: Dictionary<string[]> = {
         'Onii-chan',
         'Oops',
         'Hey nonbinary hoes',
+        'ruhroh',
+        'WEEWOO',
+        'wee woo'
     ],
 
     'Friends': [
@@ -131,8 +137,7 @@ const controlContainerRef = dom.ref<HTMLDivElement>('control-container')
 const audioSliderRef = dom.ref<HTMLInputElement>('volume-slider')
 const playAllRef = dom.ref<HTMLButtonElement>('play-button')
 const stopAllRef = dom.ref<HTMLButtonElement>('stop-button')
-
-type AudioControl = { buttonElement: HTMLButtonElement, audioElement: HTMLAudioElement }
+const playFriendsRef = dom.ref<HTMLButtonElement>('friends-button')
 
 let audioControls: AudioControl[] = []
 
@@ -141,12 +146,11 @@ function getButtonPlayTimeBackground(playTimeAmount: number) {
 }
 
 function animate() {
-    for (const { audioElement, buttonElement } of audioControls) {
-        if (!audioElement.paused) {
-            const playTime = audioElement.currentTime / audioElement.duration
-            buttonElement.style.background = getButtonPlayTimeBackground(playTime)
+    for (const control of audioControls) {
+        if (control.currentlyPlaying) {
+            control.buttonElement.style.background = getButtonPlayTimeBackground(control.getElapsedTime())
         } else {
-            buttonElement.style.background = ''
+            control.buttonElement.style.background = ''
         }
     }
 
@@ -155,58 +159,108 @@ function animate() {
 
 requestAnimationFrame(animate)
 
-function createAudioButton(name: string, audioElement: HTMLAudioElement) {
+async function updateVolume() {
+    for (const { audioGain } of audioControls) {
+        const audioSlider = await audioSliderRef.get()
+        audioGain.gain.setValueAtTime(Number.parseInt(audioSlider.value) / 100, 0)
+    }
+}
+
+class AudioControl {
+    readonly buttonElement: HTMLButtonElement
+    readonly audioContext: AudioContext
+    readonly audioBuffer: AudioBuffer
+    readonly audioGain: GainNode
+    currentlyPlaying: boolean = false
+    startTime: number
+    private requestPlayAfterStop: boolean = false
+
+    private audioSource: AudioBufferSourceNode | undefined
+
+    constructor(
+        buttonElement: HTMLButtonElement,
+        audioContext: AudioContext,
+        audioBuffer: AudioBuffer,
+        audioGain: GainNode
+    ) {
+        this.buttonElement = buttonElement
+        this.audioContext = audioContext
+        this.audioBuffer = audioBuffer
+        this.audioGain = audioGain
+        this.startTime = audioContext.currentTime
+    }
+
+    play() {
+        if (this.currentlyPlaying) {
+            this.stop()
+            this.requestPlayAfterStop = true
+            return
+        }
+
+        this.startTime = this.audioContext.currentTime
+        const newAudioSource = this.audioContext.createBufferSource()
+        this.audioSource = newAudioSource
+        this.audioSource.buffer = this.audioBuffer
+        this.audioSource.connect(this.audioGain)
+        this.audioSource.start(0)
+        this.currentlyPlaying = true
+
+        this.audioSource?.addEventListener('ended', event => {
+            this.currentlyPlaying = false
+            if (this.requestPlayAfterStop) {
+                this.play()
+                this.requestPlayAfterStop = false
+            } 
+        })
+    }
+
+    stop() {
+        this.audioSource?.stop()
+        this.audioSource = undefined
+        this.currentlyPlaying = false
+    }
+
+    getElapsedTime() {
+        if (!this.currentlyPlaying) {
+            return 0
+        }
+        const currentTime = this.audioContext.currentTime - this.startTime
+        return currentTime / this.audioBuffer.duration
+    }
+}
+
+async function createAudioButton(name: string, index: number) {
+    const audioContext = new AudioContext()
+    const audioBuffer = await audio.load(`../audio/${name}.mp3`, audioContext)
+    const audioGain = audioContext.createGain()
+    audioGain.connect(audioContext.destination)
+
     const buttonElement = document.createElement('button')
     buttonElement.className = 'audio-button'
-    //buttonElement.setAttribute('pressed', '')
-    let currentlyPlaying = false
+    buttonElement.setAttribute('pressed', '')
+    buttonElement.style.order = index.toString()
     const buttonTitleElement = document.createElement('p')
     buttonTitleElement.textContent = name
     buttonElement.appendChild(buttonTitleElement)
+
+    const audioControl = new AudioControl(buttonElement, audioContext, audioBuffer, audioGain)
+
     buttonElement.onclick = async event => {
-        const isShift = event.shiftKey
-        if (isShift) {
-            audioElement.currentTime = 0
-            audioElement.pause()
-        } else {
-            audioElement.currentTime = 0
-            if (!currentlyPlaying) {
-                const audioSlider = await audioSliderRef.get()
-                audioElement.volume = Number.parseInt(audioSlider.value) / 100
-                audioElement.play()
-            }
-        }
+        updateVolume()
+        audioControl.play()
     }
 
-    return buttonElement
+    buttonElement.oncontextmenu = async event => {
+        audioControl.stop()
+    }
+
+    return audioControl
 }
 
-function addSound(controlContainer: HTMLElement, name: string) {
-    let audioElement = document.createElement('audio')
-    audioElement.setAttribute('src', `../audio/${name}.mp3`)
-    controlContainer.appendChild(audioElement)
-    
-    let buttonElement = createAudioButton(name, audioElement)
-    controlContainer.appendChild(buttonElement)
-
-    audioControls.push({
-        audioElement, buttonElement
-    })
-
-    audioElement.onplay = event => {
-        buttonElement.setAttribute('playing', '')
-    }
-
-    audioElement.onpause = event => {
-        buttonElement.removeAttribute('playing')
-    }
-}
-
-async function updateVolume() {
-    for (const { audioElement } of audioControls) {
-        const audioSlider = await audioSliderRef.get()
-        audioElement.volume = Number.parseInt(audioSlider.value) / 100
-    }
+async function addSound(controlContainer: HTMLElement, name: string, index: number) {
+    let audioControl = await createAudioButton(name, index)
+    controlContainer.appendChild(audioControl.buttonElement)
+    audioControls.push(audioControl)
 }
 
 async function initAudioSlider() {
@@ -219,25 +273,16 @@ async function initAudioSlider() {
     }
 }
 
-let shouldStopPlayingAll = false
-
 async function playAll() {
+    updateVolume()
     for (const control of audioControls) {
-        await sleep(50)
-        if (shouldStopPlayingAll) {
-            shouldStopPlayingAll = false
-            return
-        }
-        control.audioElement.currentTime = 0
-        control.audioElement.play()
+        control.play()
     }
 }
 
 async function stopAll() {
-    shouldStopPlayingAll = true
     for (const control of audioControls) {
-        control.audioElement.pause()
-        control.audioElement.currentTime = 0
+        control.stop()
     }
 }
 
@@ -256,6 +301,10 @@ function* categoriesIter() {
 }
 
 async function start() {
+    document.oncontextmenu = event => {
+        event.preventDefault()
+    }
+
     const categories = Array.from(categoriesIter())
     const audioEntries = Array.from(audioFilesIter())
 
@@ -272,8 +321,11 @@ async function start() {
 
         controlContainer.appendChild(container)
 
+        let i = 0
+
         for (const name of audioFiles[category]) {
-            addSound(container, name)
+            addSound(container, name, i)
+            i++;
         }
     }
 
@@ -288,6 +340,12 @@ async function start() {
     stopAllButton.onclick = () => {
         stopAll()
     }
+
+    const friendsButton = await playFriendsRef.get()
+    friendsButton.onclick = () => {
+
+    }
+
 }
 
 start()

@@ -31,7 +31,7 @@ body {
 .category-column {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: 2em repeat(100, 3em);
+    grid-template-rows: 2em repeat(100, 1.5em);
     gap: 0.5em;
     /* gap: 1em; */
     /* width: 12em; */
@@ -47,6 +47,9 @@ body {
     /* width: 100%; */
     /* width: 50%; */
     width: 10em;
+    padding: 0;
+    padding-left: 0.5em;
+    padding-right: 0.5em;
 }
 
 .audio-button {
