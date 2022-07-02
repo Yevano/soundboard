@@ -142,6 +142,9 @@ const audioFiles: Dictionary<string[]> = {
 const controlContainerRef = dom.ref<HTMLDivElement>('control-container')
 const volumeSliderRef = dom.ref<HTMLInputElement>('volume-slider')
 const pitchSliderRef = dom.ref<HTMLInputElement>('pitch-slider')
+const drySliderRef = dom.ref<HTMLInputElement>('reverb-dry-slider')
+const wetSliderRef = dom.ref<HTMLInputElement>('reverb-wet-slider')
+const delaySliderRef = dom.ref<HTMLInputElement>('reverb-delay-slider')
 const playAllRef = dom.ref<HTMLButtonElement>('play-button')
 const stopAllRef = dom.ref<HTMLButtonElement>('stop-button')
 const playFriendsRef = dom.ref<HTMLButtonElement>('friends-button')
@@ -193,9 +196,26 @@ async function updatePitch() {
     }
 }
 
+async function updateReverb() {
+    let drySlider = await drySliderRef.get()
+    let wetSlider = await wetSliderRef.get()
+    let delaySlider = await delaySliderRef.get()
+
+    const dry = getSliderValue(drySlider) / 100
+    const wet = getSliderValue(wetSlider) / 100
+    const delay = getSliderValue(delaySlider) / 100
+
+    for (const control of audioControls) {
+        control.reverbNodes.dryGain.gain.value = dry
+        control.reverbNodes.wetGain.gain.value = wet
+        control.reverbNodes.delayNode.delayTime.value = delay
+    }
+}
+
 async function updateModifiers() {
-    updateVolume()
-    updatePitch()
+    await updateVolume()
+    await updatePitch()
+    await updateReverb()
 }
 
 class AudioControl {
@@ -204,6 +224,7 @@ class AudioControl {
     readonly audioBuffer: AudioBuffer
     readonly audioGain: GainNode
     readonly category: string
+    readonly reverbNodes: audio.ReverbNodes
     currentlyPlaying: boolean = false
     startTime: number
     pitchMultiplier = 1
@@ -216,6 +237,7 @@ class AudioControl {
         audioContext: AudioContext,
         audioBuffer: AudioBuffer,
         audioGain: GainNode,
+        reverbNodes: audio.ReverbNodes,
         category: string
     ) {
         this.buttonElement = buttonElement
@@ -223,6 +245,7 @@ class AudioControl {
         this.audioBuffer = audioBuffer
         this.audioGain = audioGain
         this.startTime = audioContext.currentTime
+        this.reverbNodes = reverbNodes
         this.category = category
     }
 
@@ -258,12 +281,22 @@ class AudioControl {
         this.currentlyPlaying = false
     }
 
+    getDuration() {
+        return this.audioBuffer.duration * this.pitchMultiplier
+    }
+
     getElapsedTime() {
         if (!this.currentlyPlaying || this.audioSource === undefined) {
             return 0
         }
-        const currentTime = this.audioContext.currentTime - this.startTime
-        return currentTime / this.audioBuffer.duration * this.pitchMultiplier
+        let currentTime = this.audioContext.currentTime - this.startTime
+        const duration = this.getDuration()
+
+        if (this.audioSource.loop) {
+            currentTime %= duration
+        }
+
+        return currentTime / duration
     }
 }
 
@@ -271,7 +304,8 @@ async function createAudioButton(name: string, category: string, index: number) 
     const audioContext = new AudioContext()
     const audioBuffer = await audio.load(`../audio/${name}.mp3`, audioContext)
     const audioGain = audioContext.createGain()
-    audioGain.connect(audioContext.destination)
+
+    const reverbNodes = audio.connectReverb(audioContext, audioGain, audioContext.destination)
 
     const buttonElement = document.createElement('button')
     buttonElement.className = 'audio-button'
@@ -281,7 +315,7 @@ async function createAudioButton(name: string, category: string, index: number) 
     buttonTitleElement.textContent = name
     buttonElement.appendChild(buttonTitleElement)
 
-    const audioControl = new AudioControl(buttonElement, audioContext, audioBuffer, audioGain, category)
+    const audioControl = new AudioControl(buttonElement, audioContext, audioBuffer, audioGain, reverbNodes, category)
 
     buttonElement.onclick = async event => {
         updateModifiers()
@@ -304,16 +338,34 @@ async function addSound(controlContainer: HTMLElement, name: string, category: s
 async function initAudioSlider() {
     let volumeSlider = await volumeSliderRef.get()
     let pitchSlider = await pitchSliderRef.get()
+    let drySlider = await drySliderRef.get()
+    let wetSlider = await wetSliderRef.get()
+    let delaySlider = await delaySliderRef.get()
 
+    
     await updateModifiers()
     volumeSlider.onchange = async event => {
         await updateModifiers()
     }
+
     pitchSlider.onchange = async event => {
         await updateModifiers()
     }
+
     pitchSlider.oncontextmenu = async event => {
         pitchSlider.value = '50'
+        await updateModifiers()
+    }
+
+    drySlider.onchange = async event => {
+        await updateModifiers()
+    }
+
+    wetSlider.onchange = async event => {
+        await updateModifiers()
+    }
+
+    delaySlider.onchange = async event => {
         await updateModifiers()
     }
 }

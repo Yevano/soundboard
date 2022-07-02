@@ -28,6 +28,23 @@ body {
     gap: 1em;
 }
 
+.sliders {
+    display: flex;
+    flex-direction: column;
+
+}
+
+.sliders > div {
+    display: flex;
+    flex-direction: row;
+}
+
+.sliders p {
+    color: white;
+    width: 6em;
+    margin: 0;
+}
+
 .category-column {
     display: grid;
     grid-template-columns: 1fr 1fr;
