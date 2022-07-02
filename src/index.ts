@@ -335,39 +335,36 @@ async function addSound(controlContainer: HTMLElement, name: string, category: s
     audioControls.push(audioControl)
 }
 
+function setSliderReset(slider: HTMLInputElement, value: string) {
+    slider.oncontextmenu = async event => {
+        slider.value = value
+        await updateModifiers()
+    }
+}
+
+function setSliderUpdate(slider: HTMLInputElement) {
+    slider.onchange = event => { updateModifiers() }
+}
+
 async function initAudioSlider() {
     let volumeSlider = await volumeSliderRef.get()
     let pitchSlider = await pitchSliderRef.get()
     let drySlider = await drySliderRef.get()
     let wetSlider = await wetSliderRef.get()
     let delaySlider = await delaySliderRef.get()
-
     
     await updateModifiers()
-    volumeSlider.onchange = async event => {
-        await updateModifiers()
-    }
+    setSliderUpdate(volumeSlider)
+    setSliderUpdate(pitchSlider)
+    setSliderUpdate(drySlider)
+    setSliderUpdate(wetSlider)
+    setSliderUpdate(delaySlider)
 
-    pitchSlider.onchange = async event => {
-        await updateModifiers()
-    }
-
-    pitchSlider.oncontextmenu = async event => {
-        pitchSlider.value = '50'
-        await updateModifiers()
-    }
-
-    drySlider.onchange = async event => {
-        await updateModifiers()
-    }
-
-    wetSlider.onchange = async event => {
-        await updateModifiers()
-    }
-
-    delaySlider.onchange = async event => {
-        await updateModifiers()
-    }
+    setSliderReset(volumeSlider, '25')
+    setSliderReset(pitchSlider, '50')
+    setSliderReset(drySlider, '100')
+    setSliderReset(wetSlider, '0')
+    setSliderReset(delaySlider, '25')
 }
 
 async function playAll() {
