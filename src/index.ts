@@ -1,6 +1,7 @@
 import { audio } from "./audio"
 import { dom } from "./dom"
-import { Dictionary, sleep } from "./util"
+import { Recorder } from "./recording-bank"
+import { Dictionary, flatten, sleep } from "./util"
 
 const audioFiles: Dictionary<string[]> = {
     'SFX': [
@@ -74,13 +75,11 @@ const audioFiles: Dictionary<string[]> = {
         'We Love You',
         'I am here squandering my life away',
         'Suboptimal',
-        'Vindows R',
         'Id fight a homeless guy',
-        'Yeah',
         'Youre gaslighting me',
         'Elements of bathrooms',
     ],
-
+    
     'Clips': [
         'FBI open up',
         'Witness the power',
@@ -98,7 +97,9 @@ const audioFiles: Dictionary<string[]> = {
         'Hey nonbinary hoes',
         'ruhroh',
         'WEEWOO',
-        'wee woo'
+        'wee woo',
+        'Future',
+        'SUPNERDS',
     ],
 
     'Friends': [
@@ -136,6 +137,8 @@ const audioFiles: Dictionary<string[]> = {
         'Yeah he can go die',
         'Your space your area',
         'Youre dead',
+        'Vindows R',
+        'Yeah',
     ]
 }
 
@@ -149,11 +152,27 @@ const playAllRef = dom.ref<HTMLButtonElement>('play-button')
 const stopAllRef = dom.ref<HTMLButtonElement>('stop-button')
 const playFriendsRef = dom.ref<HTMLButtonElement>('friends-button')
 const loopModeRef = dom.ref<HTMLButtonElement>('loop-button')
+const recordingBankContainerRef = dom.ref<HTMLDivElement>('recording-bank')
 
-const audioControls: AudioControl[] = []
+const globalAudioContext = new AudioContext()
+
+const audioEffects = new audio.AudioEffects(globalAudioContext)
+audioEffects.postGain.connect(globalAudioContext.destination)
+
+const recorders: Recorder[] = []
+const audioControls: audio.AudioControl[] = []
+
+function getAudioPlayers() {
+    return flatten<audio.AudioPlayer>([recorders, audioControls])
+}
+
 let loopMode = false
 
 function getButtonPlayTimeBackground(playTimeAmount: number) {
+    return `linear-gradient(to right, #4d8050 ${playTimeAmount * 100}%, #6cb370 ${playTimeAmount * 100}%)`
+}
+
+function getRecordingButtonPlayTimeBackground(playTimeAmount: number) {
     return `linear-gradient(to right, #4d8050 ${playTimeAmount * 100}%, #6cb370 ${playTimeAmount * 100}%)`
 }
 
@@ -163,6 +182,14 @@ function animate() {
             control.buttonElement.style.background = getButtonPlayTimeBackground(control.getElapsedTime())
         } else {
             control.buttonElement.style.background = ''
+        }
+    }
+
+    for (const recorder of recorders) {
+        if (recorder.currentlyPlaying) {
+            recorder.buttonElement.style.background = getRecordingButtonPlayTimeBackground(recorder.getElapsedTime())
+        } else {
+            recorder.buttonElement.style.background = ''
         }
     }
 
@@ -178,9 +205,7 @@ function getSliderValue(slider: HTMLInputElement) {
 async function updateVolume() {
     const audioSlider = await volumeSliderRef.get()
     const value = getSliderValue(audioSlider) / 100
-    for (const { audioGain } of audioControls) {
-        audioGain.gain.setValueAtTime(value, 0)
-    }
+    audioEffects.setGain(value)
 }
 
 async function updatePitch() {
@@ -191,8 +216,8 @@ async function updatePitch() {
     } else {
         value = (value - 0.5) / 1.5 + 1
     }
-    for (const control of audioControls) {
-        control.pitchMultiplier = value
+    for (const player of getAudioPlayers()) {
+        player.detune(value)
     }
 }
 
@@ -205,11 +230,7 @@ async function updateReverb() {
     const wet = getSliderValue(wetSlider) / 100
     const delay = getSliderValue(delaySlider) / 100
 
-    for (const control of audioControls) {
-        control.reverbNodes.dryGain.gain.value = dry
-        control.reverbNodes.wetGain.gain.value = wet
-        control.reverbNodes.delayNode.delayTime.value = delay
-    }
+    audioEffects.setReverb(dry, wet, delay)
 }
 
 async function updateModifiers() {
@@ -218,94 +239,8 @@ async function updateModifiers() {
     await updateReverb()
 }
 
-class AudioControl {
-    readonly buttonElement: HTMLButtonElement
-    readonly audioContext: AudioContext
-    readonly audioBuffer: AudioBuffer
-    readonly audioGain: GainNode
-    readonly category: string
-    readonly reverbNodes: audio.ReverbNodes
-    currentlyPlaying: boolean = false
-    startTime: number
-    pitchMultiplier = 1
-    private requestPlayAfterStop: boolean = false
-
-    private audioSource: AudioBufferSourceNode | undefined
-
-    constructor(
-        buttonElement: HTMLButtonElement,
-        audioContext: AudioContext,
-        audioBuffer: AudioBuffer,
-        audioGain: GainNode,
-        reverbNodes: audio.ReverbNodes,
-        category: string
-    ) {
-        this.buttonElement = buttonElement
-        this.audioContext = audioContext
-        this.audioBuffer = audioBuffer
-        this.audioGain = audioGain
-        this.startTime = audioContext.currentTime
-        this.reverbNodes = reverbNodes
-        this.category = category
-    }
-
-    play() {
-        if (this.currentlyPlaying) {
-            this.stop()
-            this.requestPlayAfterStop = true
-            return
-        }
-
-        this.startTime = this.audioContext.currentTime
-        const newAudioSource = this.audioContext.createBufferSource()
-        this.audioSource = newAudioSource
-        this.audioSource.loop = loopMode
-        this.audioSource.detune.setValueAtTime(Math.log2(this.pitchMultiplier) * 1200, 0)
-        this.audioSource.buffer = this.audioBuffer
-        this.audioSource.connect(this.audioGain)
-        this.audioSource.start(0)
-        this.currentlyPlaying = true
-
-        this.audioSource?.addEventListener('ended', event => {
-            this.currentlyPlaying = false
-            if (this.requestPlayAfterStop) {
-                this.play()
-                this.requestPlayAfterStop = false
-            } 
-        })
-    }
-
-    stop() {
-        this.audioSource?.stop()
-        this.audioSource = undefined
-        this.currentlyPlaying = false
-    }
-
-    getDuration() {
-        return this.audioBuffer.duration * this.pitchMultiplier
-    }
-
-    getElapsedTime() {
-        if (!this.currentlyPlaying || this.audioSource === undefined) {
-            return 0
-        }
-        let currentTime = this.audioContext.currentTime - this.startTime
-        const duration = this.getDuration()
-
-        if (this.audioSource.loop) {
-            currentTime %= duration
-        }
-
-        return currentTime / duration
-    }
-}
-
 async function createAudioButton(name: string, category: string, index: number) {
-    const audioContext = new AudioContext()
-    const audioBuffer = await audio.load(`../audio/${name}.mp3`, audioContext)
-    const audioGain = audioContext.createGain()
-
-    const reverbNodes = audio.connectReverb(audioContext, audioGain, audioContext.destination)
+    const audioBuffer = await audio.load(`../audio/${name}.mp3`, globalAudioContext)
 
     const buttonElement = document.createElement('button')
     buttonElement.className = 'audio-button'
@@ -315,7 +250,7 @@ async function createAudioButton(name: string, category: string, index: number) 
     buttonTitleElement.textContent = name
     buttonElement.appendChild(buttonTitleElement)
 
-    const audioControl = new AudioControl(buttonElement, audioContext, audioBuffer, audioGain, reverbNodes, category)
+    const audioControl = new audio.AudioControl(buttonElement, globalAudioContext, audioBuffer, audioEffects.preGain, category)
 
     buttonElement.onclick = async event => {
         updateModifiers()
@@ -343,7 +278,7 @@ function setSliderReset(slider: HTMLInputElement, value: string) {
 }
 
 function setSliderUpdate(slider: HTMLInputElement) {
-    slider.onchange = event => { updateModifiers() }
+    slider.oninput = event => { updateModifiers() }
 }
 
 async function initAudioSlider() {
@@ -456,6 +391,37 @@ async function start() {
         } else {
             loopModeButton.removeAttribute('active')
         }
+    }
+
+    const recordingBankContainer = await recordingBankContainerRef.get()
+    
+    for (let i = 0; i < 4; i++) {
+        const buttonElement = document.createElement('button')
+        const recorder = new Recorder(buttonElement, i, globalAudioContext, audioEffects.getEffectOutputNode(), audioEffects.preGain)
+        recorders.push(recorder)
+        buttonElement.appendChild(dom.text('p', `Recording #${i + 1}`))
+        buttonElement.onclick = event => {
+            if (recorder.currentlyRecording) {
+                buttonElement.removeAttribute('recording')
+                recorder.stopRecording()
+                return
+            }
+
+            if (event.shiftKey) {
+                buttonElement.setAttribute('recording', 'recording')
+                recorder.record()
+            } else {
+                updateModifiers()
+                recorder.play()
+            }
+        }
+
+        buttonElement.oncontextmenu = event => {
+            recorder.stop()
+        }
+
+        recordingBankContainer.appendChild(buttonElement)
+
     }
 }
 

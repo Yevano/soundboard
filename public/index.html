@@ -6,33 +6,38 @@
     <link rel="stylesheet" href="./index.css">
 </head>
 <body>
-    <div class="main-controls">
-        <div class="sliders">
-            <div>
-                <p>Volume</p>
-                <input type="range" min="0" max="100" value="50" class="slider" id="volume-slider">
+    <div class="top-controls">
+        <div class="main-controls">
+            <div class="sliders">
+                <div>
+                    <p>Volume</p>
+                    <input type="range" min="0" max="100" value="50" class="slider" id="volume-slider">
+                </div>
+                <div>
+                    <p>Pitch</p>
+                    <input type="range" min="0" max="100" value="50" class="slider" id="pitch-slider">
+                </div>
+                <div>
+                    <p>Dry</p>
+                    <input type="range" min="0" max="100" value="100" class="slider" id="reverb-dry-slider">
+                </div>
+                <div>
+                    <p>Wet</p>
+                    <input type="range" min="0" max="100" value="0" class="slider" id="reverb-wet-slider">
+                </div>
+                <div>
+                    <p>Delay</p>
+                    <input type="range" min="0" max="100" value="50" class="slider" id="reverb-delay-slider">
+                </div>
             </div>
-            <div>
-                <p>Pitch</p>
-                <input type="range" min="0" max="100" value="50" class="slider" id="pitch-slider">
-            </div>
-            <div>
-                <p>Dry</p>
-                <input type="range" min="0" max="100" value="100" class="slider" id="reverb-dry-slider">
-            </div>
-            <div>
-                <p>Wet</p>
-                <input type="range" min="0" max="100" value="0" class="slider" id="reverb-wet-slider">
-            </div>
-            <div>
-                <p>Delay</p>
-                <input type="range" min="0" max="100" value="50" class="slider" id="reverb-delay-slider">
-            </div>
+            <button class="audio-button" id="play-button">Play all</button>
+            <button class="audio-button" id="stop-button">Stop all</button>
+            <button class="audio-button" id="friends-button">Play friends</button>
+            <button class="audio-button loop-mode" id="loop-button">Loop Mode</button>
         </div>
-        <button class="audio-button" id="play-button">Play all</button>
-        <button class="audio-button" id="stop-button">Stop all</button>
-        <button class="audio-button" id="friends-button">Play friends</button>
-        <button class="audio-button loop-mode" id="loop-button">Loop Mode</button>
+        <div class="recording-bank" id="recording-bank">
+
+        </div>
     </div>
     <div id="control-container"  />
 </body>

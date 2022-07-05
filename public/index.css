@@ -20,12 +20,36 @@ body {
     padding-left: 4em;
 }
 
+.page-top {
+    display: flex;
+    flex-direction: row;
+    gap: 1em;
+    justify-content: flex-start;
+}
+
+.top-controls {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 1em;
+}
+
 .main-controls {
     display: flex;
     flex-direction: row;
     margin-bottom: 2em;
     align-items: center;
     gap: 1em;
+    flex-grow: 0;
+}
+
+.recording-bank {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1
 }
 
 .sliders {
@@ -88,6 +112,19 @@ body {
     text-overflow: ellipsis ellipsis;
     overflow: hidden;
     text-align: center;
+}
+
+.recording-bank button {
+    border: 1px solid black;
+    border-radius: 10px;
+    font-weight: bold;
+    height: 3em;
+    background-color: #ff5656;
+    text-align: center;
+}
+
+.recording-bank button[recording] {
+    filter: brightness(150%);
 }
 
 .column-title {

@@ -46,4 +46,152 @@ export namespace audio {
             dryGain, delayNode, wetGain
         }
     }
+
+    export interface AudioPlayer {
+        play(): void
+        stop(): void
+        detune(pitchMultiplier: number): void
+        getDuration(): number
+        getElapsedTime(): number
+        getOutput(): AudioNode
+    }
+
+    export abstract class AudioBufferSourcePlayer implements AudioPlayer {
+        currentlyPlaying: boolean = false
+        startTime: number = 0
+        private requestPlayAfterStop: boolean = false
+        private audioSource: AudioBufferSourceNode | undefined
+        private pitchMultiplier: number = 1
+        output: AudioNode
+
+        constructor(output: AudioNode) {
+            this.output = output
+        }
+
+        abstract getAudioContext(): AudioContext
+        abstract getLoopMode(): boolean
+        abstract getAudioBuffer(): AudioBuffer
+
+        getOutput() {
+            return this.output
+        }
+        
+        play(): void {
+            if (this.currentlyPlaying) {
+                this.stop()
+                this.requestPlayAfterStop = true
+                return
+            }
+    
+            this.startTime = this.getAudioContext().currentTime
+            const newAudioSource = this.getAudioContext().createBufferSource()
+            this.audioSource = newAudioSource
+            this.audioSource.loop = this.getLoopMode()
+            this.detune(this.pitchMultiplier)
+            this.audioSource.buffer = this.getAudioBuffer()
+            this.audioSource.connect(this.output)
+            this.audioSource.start(0)
+            this.currentlyPlaying = true
+    
+            this.audioSource?.addEventListener('ended', event => {
+                this.currentlyPlaying = false
+                if (this.requestPlayAfterStop) {
+                    this.play()
+                    this.requestPlayAfterStop = false
+                } 
+            })
+        }
+
+        stop(): void {
+            this.audioSource?.stop()
+            this.audioSource = undefined
+            this.currentlyPlaying = false
+        }
+
+        detune(pitchMultiplier: number) {
+            this.pitchMultiplier = pitchMultiplier
+            if(this.audioSource !== undefined) {
+                this.audioSource.detune.value = Math.log2(this.pitchMultiplier) * 1200
+            }
+        }
+    
+        getDuration() {
+            return this.getAudioBuffer().duration * this.pitchMultiplier
+        }
+    
+        getElapsedTime() {
+            if (!this.currentlyPlaying || this.audioSource === undefined) {
+                return 0
+            }
+            let currentTime = this.getAudioContext().currentTime - this.startTime
+            const duration = this.getDuration()
+    
+            if (this.audioSource.loop) {
+                currentTime %= duration
+            }
+    
+            return currentTime / duration
+        }
+    }
+
+    export class AudioControl extends AudioBufferSourcePlayer {
+        readonly buttonElement: HTMLButtonElement
+        readonly audioContext: AudioContext
+        readonly audioBuffer: AudioBuffer
+        readonly category: string
+        loopMode: boolean = false
+    
+        constructor(
+            buttonElement: HTMLButtonElement,
+            audioContext: AudioContext,
+            audioBuffer: AudioBuffer,
+            output: AudioNode,
+            category: string
+        ) {
+            super(output)
+            this.buttonElement = buttonElement
+            this.audioContext = audioContext
+            this.audioBuffer = audioBuffer
+            this.startTime = audioContext.currentTime
+            this.category = category
+        }
+
+        getAudioContext(): AudioContext {
+            return this.audioContext
+        }
+        
+        getLoopMode(): boolean {
+            return this.loopMode
+        }
+
+        getAudioBuffer(): AudioBuffer {
+            return this.audioBuffer
+        }
+    }
+
+    export class AudioEffects {
+        readonly preGain: GainNode
+        readonly postGain: GainNode
+        readonly reverbNodes: ReverbNodes
+
+        constructor(readonly audioContext: AudioContext) {
+            this.preGain = audioContext.createGain()
+            this.postGain = audioContext.createGain()
+            this.reverbNodes = connectReverb(audioContext, this.preGain, this.postGain)
+        }
+
+        setGain(value: number): void {
+            this.postGain.gain.setValueAtTime(value, 0)
+        }
+
+        setReverb(dry: number, wet: number, delay: number): void {
+            this.reverbNodes.dryGain.gain.value = dry
+            this.reverbNodes.wetGain.gain.value = wet
+            this.reverbNodes.delayNode.delayTime.value = delay
+        }
+
+        getEffectOutputNode(): AudioNode {
+            return this.reverbNodes.wetGain
+        }
+    }
 }

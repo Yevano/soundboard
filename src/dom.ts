@@ -27,7 +27,11 @@ export namespace dom {
         })
     }
 
-    export class HTMLElementRef<T extends HTMLElement> {
+    export interface HTMLElementRef<T extends HTMLElement> {
+        get(): Promise<T>
+    }
+
+    export class HTMLElementByIdRef<T extends HTMLElement> implements HTMLElementRef<T> {
         readonly id: string
         element: T | undefined
 
@@ -44,7 +48,45 @@ export namespace dom {
         }
     }
 
+    export class BasicHTMLElementRef<T extends HTMLElement> implements HTMLElementRef<T> {
+        private element: T | undefined
+        private subscriber: (callback: (element: T) => void) => void
+
+        constructor(subscriber: (callback: (element: T) => void) => void) {
+            this.subscriber = subscriber
+        }
+
+        get(): Promise<T> {
+            return new Promise((resolve, reject) => {
+                if (this.element !== undefined) {
+                    resolve(this.element)
+                } else {
+                    this.subscriber(element => {
+                        this.element = element
+                        resolve(element)
+                    })
+                }
+            })
+        }
+    }
+
     export function ref<T extends HTMLElement>(id: string) {
-        return new HTMLElementRef<T>(id)
+        return new HTMLElementByIdRef<T>(id)
+    }
+
+    export function create<K extends keyof HTMLElementTagNameMap>(
+        tagName: K,
+        ref: HTMLElementRef<HTMLElementTagNameMap[K]>,
+        ...children: HTMLElement[]
+    ) {
+        
+    }
+
+    export function text<K extends keyof HTMLElementTagNameMap>(
+        tagName: K, text: string
+    ): HTMLElementTagNameMap[K] {
+        const result = document.createElement(tagName)
+        result.textContent = text
+        return result
     }
 }
