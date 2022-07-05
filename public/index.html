@@ -4,6 +4,9 @@
     <!-- <script>var exports = {};</script> -->
     <script src="./index.js"></script>
     <link rel="stylesheet" href="./index.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap" rel="stylesheet"> 
 </head>
 <body>
     <div class="top-controls">
@@ -30,10 +33,12 @@
                     <input type="range" min="0" max="100" value="50" class="slider" id="reverb-delay-slider">
                 </div>
             </div>
-            <button class="audio-button" id="play-button">Play all</button>
-            <button class="audio-button" id="stop-button">Stop all</button>
-            <button class="audio-button" id="friends-button">Play friends</button>
-            <button class="audio-button loop-mode" id="loop-button">Loop Mode</button>
+            <div class="main-buttons">
+                <button class="audio-button" id="play-button">Play all</button>
+                <button class="audio-button" id="stop-button">Stop all</button>
+                <button class="audio-button" id="friends-button">Play friends</button>
+                <button class="audio-button loop-mode" id="loop-button">Loop Mode</button>
+            </div>
         </div>
         <div class="recording-bank" id="recording-bank">
 

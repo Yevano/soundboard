@@ -1,7 +1,7 @@
 import { audio } from "./audio"
 import { dom } from "./dom"
 import { Recorder } from "./recording-bank"
-import { Dictionary, flatten, sleep } from "./util"
+import { Color, colorFromAngle, Dictionary, flatten, sleep } from "./util"
 
 const audioFiles: Dictionary<string[]> = {
     'SFX': [
@@ -169,11 +169,11 @@ function getAudioPlayers() {
 let loopMode = false
 
 function getButtonPlayTimeBackground(playTimeAmount: number) {
-    return `linear-gradient(to right, #4d8050 ${playTimeAmount * 100}%, #6cb370 ${playTimeAmount * 100}%)`
+    return `linear-gradient(to right, #8c7099aa ${playTimeAmount * 100}%, #8c709945 ${playTimeAmount * 100}%)`
 }
 
 function getRecordingButtonPlayTimeBackground(playTimeAmount: number) {
-    return `linear-gradient(to right, #4d8050 ${playTimeAmount * 100}%, #6cb370 ${playTimeAmount * 100}%)`
+    return `linear-gradient(to right, #ff5656d0 ${playTimeAmount * 100}%, #ff565694 ${playTimeAmount * 100}%)`
 }
 
 function animate() {
@@ -264,7 +264,7 @@ async function createAudioButton(name: string, category: string, index: number) 
     return audioControl
 }
 
-async function addSound(controlContainer: HTMLElement, name: string, category: string, index: number) {
+async function addSound(controlContainer: HTMLElement, name: string, category: string, index: number, color: Color) {
     let audioControl = await createAudioButton(name, category, index)
     controlContainer.appendChild(audioControl.buttonElement)
     audioControls.push(audioControl)
@@ -348,22 +348,31 @@ async function start() {
     const controlContainer = await controlContainerRef.get()
     controlContainer.style.gridTemplateColumns = `repeat(${categories.length}, ${100 / categories.length}%)`
 
+    let hue = 0
+    let numCategories = categories.length
+
     for (const category in audioFiles) {
         const container = document.createElement('div')
         container.className = 'category-column'
+        controlContainer.appendChild(container)
+
+        const buttonGridContainer = document.createElement('div')
+        buttonGridContainer.className = 'category-column-button-grid'
         const columnTitleElement = document.createElement('p')
         columnTitleElement.textContent = category
         columnTitleElement.className = 'column-title'
-        container.appendChild(columnTitleElement)
+        buttonGridContainer.appendChild(columnTitleElement)
 
-        controlContainer.appendChild(container)
+        container.appendChild(buttonGridContainer)
 
         let i = 0
 
         for (const name of audioFiles[category]) {
-            addSound(container, name, category, i)
+            addSound(buttonGridContainer, name, category, i, colorFromAngle(hue))
             i++;
         }
+
+        hue += 2 * Math.PI / numCategories
     }
 
     await initAudioSlider()
