@@ -170,28 +170,27 @@ export namespace audio {
     }
 
     export class AudioEffects {
-        readonly preGain: GainNode
-        readonly postGain: GainNode
+        readonly inputNode: GainNode
+        readonly preGainNode: GainNode
+        readonly postGainNode: GainNode
         readonly reverbNodes: ReverbNodes
 
         constructor(readonly audioContext: AudioContext) {
-            this.preGain = audioContext.createGain()
-            this.postGain = audioContext.createGain()
-            this.reverbNodes = connectReverb(audioContext, this.preGain, this.postGain)
+            this.inputNode = audioContext.createGain()
+            this.preGainNode = audioContext.createGain()
+            this.postGainNode = audioContext.createGain()
+            this.reverbNodes = connectReverb(audioContext, this.inputNode, this.preGainNode)
+            this.preGainNode.connect(this.postGainNode)
         }
 
         setGain(value: number): void {
-            this.postGain.gain.setValueAtTime(value, 0)
+            this.postGainNode.gain.setValueAtTime(value, 0)
         }
 
         setReverb(dry: number, wet: number, delay: number): void {
             this.reverbNodes.dryGain.gain.value = dry
             this.reverbNodes.wetGain.gain.value = wet
             this.reverbNodes.delayNode.delayTime.value = delay
-        }
-
-        getEffectOutputNode(): AudioNode {
-            return this.reverbNodes.wetGain
         }
     }
 }

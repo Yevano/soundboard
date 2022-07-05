@@ -157,7 +157,7 @@ const recordingBankContainerRef = dom.ref<HTMLDivElement>('recording-bank')
 const globalAudioContext = new AudioContext()
 
 const audioEffects = new audio.AudioEffects(globalAudioContext)
-audioEffects.postGain.connect(globalAudioContext.destination)
+audioEffects.postGainNode.connect(globalAudioContext.destination)
 
 const recorders: Recorder[] = []
 const audioControls: audio.AudioControl[] = []
@@ -250,7 +250,7 @@ async function createAudioButton(name: string, category: string, index: number) 
     buttonTitleElement.textContent = name
     buttonElement.appendChild(buttonTitleElement)
 
-    const audioControl = new audio.AudioControl(buttonElement, globalAudioContext, audioBuffer, audioEffects.preGain, category)
+    const audioControl = new audio.AudioControl(buttonElement, globalAudioContext, audioBuffer, audioEffects.inputNode, category)
 
     buttonElement.onclick = async event => {
         updateModifiers()
@@ -397,7 +397,7 @@ async function start() {
     
     for (let i = 0; i < 4; i++) {
         const buttonElement = document.createElement('button')
-        const recorder = new Recorder(buttonElement, i, globalAudioContext, audioEffects.getEffectOutputNode(), audioEffects.preGain)
+        const recorder = new Recorder(buttonElement, i, globalAudioContext, audioEffects.preGainNode, audioEffects.inputNode)
         recorders.push(recorder)
         buttonElement.appendChild(dom.text('p', `Recording #${i + 1}`))
         buttonElement.onclick = event => {
