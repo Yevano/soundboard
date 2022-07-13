@@ -1,5 +1,5 @@
 import { audio } from "./audio"
-import { dom } from "./dom"
+import { ref, text } from "./dom"
 import { Recorder } from "./recording-bank"
 import { Color, colorFromAngle, Dictionary, flatten, sleep } from "./util"
 
@@ -31,6 +31,7 @@ const audioFiles: Dictionary<string[]> = {
         'Clubbed to death',
         'Monster Mashturbate',
         'Crazy Bong',
+        'Crazy Bark',
     ],
 
     'Memes': [
@@ -78,6 +79,12 @@ const audioFiles: Dictionary<string[]> = {
         'Id fight a homeless guy',
         'Youre gaslighting me',
         'Elements of bathrooms',
+        'My tweet violated the twitter rules',
+        'Twitter is a rathole',
+        'Up yours woke moralists',
+        'What rules',
+        'Who cancels who',
+        'Very Stable',
     ],
     
     'Clips': [
@@ -100,6 +107,24 @@ const audioFiles: Dictionary<string[]> = {
         'wee woo',
         'Future',
         'SUPNERDS',
+        'TS Banned',
+        'TS Beep beep',
+        'TS Connection lost',
+        'TS Error',
+        'TS Hey wake up',
+        'TS Insufficient',
+        'TS See you soon',
+        'TS Sound muted',
+        'TS Sound resumed',
+        'TS User entered',
+        'TS User joined',
+        'TS User left',
+        'TS Welcome back',
+        'TS Welcome to TeamSpeak',
+        'TS You were kicked from the channel',
+        'TS You were kicked from the server',
+        'TS You were moved',
+        'TS You were banned',
     ],
 
     'Friends': [
@@ -139,20 +164,21 @@ const audioFiles: Dictionary<string[]> = {
         'Youre dead',
         'Vindows R',
         'Yeah',
+        'Ill be here all week',
     ]
 }
 
-const controlContainerRef = dom.ref<HTMLDivElement>('control-container')
-const volumeSliderRef = dom.ref<HTMLInputElement>('volume-slider')
-const pitchSliderRef = dom.ref<HTMLInputElement>('pitch-slider')
-const drySliderRef = dom.ref<HTMLInputElement>('reverb-dry-slider')
-const wetSliderRef = dom.ref<HTMLInputElement>('reverb-wet-slider')
-const delaySliderRef = dom.ref<HTMLInputElement>('reverb-delay-slider')
-const playAllRef = dom.ref<HTMLButtonElement>('play-button')
-const stopAllRef = dom.ref<HTMLButtonElement>('stop-button')
-const playFriendsRef = dom.ref<HTMLButtonElement>('friends-button')
-const loopModeRef = dom.ref<HTMLButtonElement>('loop-button')
-const recordingBankContainerRef = dom.ref<HTMLDivElement>('recording-bank')
+const controlContainerRef = ref<HTMLDivElement>('control-container')
+const volumeSliderRef = ref<HTMLInputElement>('volume-slider')
+const pitchSliderRef = ref<HTMLInputElement>('pitch-slider')
+const drySliderRef = ref<HTMLInputElement>('reverb-dry-slider')
+const wetSliderRef = ref<HTMLInputElement>('reverb-wet-slider')
+const delaySliderRef = ref<HTMLInputElement>('reverb-delay-slider')
+const playAllRef = ref<HTMLButtonElement>('play-button')
+const stopAllRef = ref<HTMLButtonElement>('stop-button')
+const playFriendsRef = ref<HTMLButtonElement>('friends-button')
+const loopModeRef = ref<HTMLButtonElement>('loop-button')
+const recordingBankContainerRef = ref<HTMLDivElement>('recording-bank')
 
 const globalAudioContext = new AudioContext()
 
@@ -400,6 +426,10 @@ async function start() {
         } else {
             loopModeButton.removeAttribute('active')
         }
+
+        for (const player of getAudioPlayers()) {
+            player.loopMode = loopMode
+        }
     }
 
     const recordingBankContainer = await recordingBankContainerRef.get()
@@ -408,7 +438,7 @@ async function start() {
         const buttonElement = document.createElement('button')
         const recorder = new Recorder(buttonElement, i, globalAudioContext, audioEffects.preGainNode, audioEffects.inputNode)
         recorders.push(recorder)
-        buttonElement.appendChild(dom.text('p', `Recording #${i + 1}`))
+        buttonElement.appendChild(text('p', `Recording #${i + 1}`))
         buttonElement.onclick = event => {
             if (recorder.currentlyRecording) {
                 buttonElement.removeAttribute('recording')

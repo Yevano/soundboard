@@ -24,6 +24,24 @@ export function* flatten<T>(xss: Iterable<Iterable<T>>): Generator<T> {
 	}
 }
 
+export function* kvs<A>(dictionary: Dictionary<A>): Generator<[string, A]> {
+	for (const key in dictionary) {
+		yield [key, dictionary[key]]
+	}
+}
+
+export function* values<A>(dictionary: Dictionary<A>): Generator<A> {
+	for (const key in dictionary) {
+		yield dictionary[key]
+	}
+}
+
+export function* ivs<A>(array: A[]): Generator<[number, A]> {
+	for (let i = 0; i < array.length; i++) {
+		yield [i, array[i]]
+	}
+}
+
 export class Color {
 	r: number
 	g: number

@@ -54,6 +54,8 @@ export namespace audio {
         getDuration(): number
         getElapsedTime(): number
         getOutput(): AudioNode
+        get loopMode(): boolean
+        set loopMode(mode: boolean)
     }
 
     export abstract class AudioBufferSourcePlayer implements AudioPlayer {
@@ -62,14 +64,22 @@ export namespace audio {
         private requestPlayAfterStop: boolean = false
         private audioSource: AudioBufferSourceNode | undefined
         private pitchMultiplier: number = 1
-        output: AudioNode
+        protected readonly output: AudioNode
+        private loopModeProp = false
 
         constructor(output: AudioNode) {
             this.output = output
         }
 
+        get loopMode(): boolean {
+            return this.loopModeProp
+        }
+
+        set loopMode(loopMode: boolean) {
+            this.loopModeProp = loopMode
+        }
+
         abstract getAudioContext(): AudioContext
-        abstract getLoopMode(): boolean
         abstract getAudioBuffer(): AudioBuffer
 
         getOutput() {
@@ -86,7 +96,7 @@ export namespace audio {
             this.startTime = this.getAudioContext().currentTime
             const newAudioSource = this.getAudioContext().createBufferSource()
             this.audioSource = newAudioSource
-            this.audioSource.loop = this.getLoopMode()
+            this.audioSource.loop = this.loopMode
             this.detune(this.pitchMultiplier)
             this.audioSource.buffer = this.getAudioBuffer()
             this.audioSource.connect(this.output)
@@ -139,7 +149,6 @@ export namespace audio {
         readonly audioContext: AudioContext
         readonly audioBuffer: AudioBuffer
         readonly category: string
-        loopMode: boolean = false
     
         constructor(
             buttonElement: HTMLButtonElement,
@@ -158,10 +167,6 @@ export namespace audio {
 
         getAudioContext(): AudioContext {
             return this.audioContext
-        }
-        
-        getLoopMode(): boolean {
-            return this.loopMode
         }
 
         getAudioBuffer(): AudioBuffer {
@@ -184,7 +189,7 @@ export namespace audio {
         }
 
         setGain(value: number): void {
-            this.postGainNode.gain.setValueAtTime(value, 0)
+            this.postGainNode.gain.value = value
         }
 
         setReverb(dry: number, wet: number, delay: number): void {

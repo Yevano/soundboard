@@ -1,11 +1,9 @@
 import { audio } from "./audio"
-import { dom } from "./dom"
 
 export class Recorder extends audio.AudioBufferSourcePlayer {
     readonly mediaStreamDestination: MediaStreamAudioDestinationNode
     private mediaRecorder: MediaRecorder | undefined
     private audioBuffer: AudioBuffer
-    loopMode: boolean = false
     currentlyRecording: boolean = false
 
     constructor(
