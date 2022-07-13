@@ -16,9 +16,31 @@ export function* iterableOf<A>(xs: Iterator<A>) {
 	}
 }
 
-export function* flatten<T>(xss: Iterable<Iterable<T>>): Generator<T> {
+export function* map<A, B>(xs: Iterable<A>, f: (x: A) => B): Generator<B> {
+	for (const x of xs) {
+		yield f(x)
+	}
+}
+
+export function* flatten<A>(xss: Iterable<Iterable<A>>): Generator<A> {
 	for (const xs of xss) {
 		for (const x of xs) {
+			yield x
+		}
+	}
+}
+
+export function* flatMap<A, B>(xs: Iterable<A>, f: (x: A) => Iterable<B>): Generator<B> {
+	for (const x of xs) {
+		for (const y of f(x)) {
+			yield y
+		}
+	}
+}
+
+export function* filter<A>(xs: Iterable<A>, f: (x: A) => boolean): Generator<A> {
+	for (const x of xs) {
+		if (f(x)) {
 			yield x
 		}
 	}
@@ -39,6 +61,39 @@ export function* values<A>(dictionary: Dictionary<A>): Generator<A> {
 export function* ivs<A>(array: A[]): Generator<[number, A]> {
 	for (let i = 0; i < array.length; i++) {
 		yield [i, array[i]]
+	}
+}
+
+export function next<A>(xs: Iterable<A>): A | undefined {
+	const iterator = xs[Symbol.iterator]()
+	const { done, value } = iterator.next()
+	if (done) return undefined
+	return value
+}
+
+export function max<T>(xs: Iterable<T>, lteOp: (a: T, b: T) => boolean): T {
+	let largest = next(xs)
+	if (largest === undefined) {
+		throw 'Iterable is empty'
+	}
+	
+	for (const x of xs) {
+		const isLTE = lteOp(largest, x)
+		largest = x
+	}
+
+	return largest
+}
+
+export function* chunkFloat32<T>(array: Float32Array, chunkLength: number) {
+	const length = array.length
+	const numberOfChunks = Math.floor(length / chunkLength)
+	const remainder = length % chunkLength
+	for (let i = 0; i < numberOfChunks; i++) {
+		yield new Float32Array(array, i * chunkLength, chunkLength)
+	}
+	if (remainder !== 0) {
+		yield new Float32Array(array, length - remainder, remainder)
 	}
 }
 

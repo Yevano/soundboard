@@ -1,7 +1,7 @@
 import { audio } from "./audio"
 import { ref, text } from "./dom"
 import { Recorder } from "./recording-bank"
-import { Color, colorFromAngle, Dictionary, flatten, sleep } from "./util"
+import { Color, colorFromAngle, Dictionary, flatten, max, sleep } from "./util"
 
 const audioFiles: Dictionary<string[]> = {
     'SFX': [
@@ -268,6 +268,13 @@ async function updateModifiers() {
 
 async function createAudioButton(name: string, category: string, index: number) {
     const audioBuffer = await audio.load(`../audio/${name}.mp3`, globalAudioContext)
+
+    for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+        const buffer = audioBuffer.getChannelData(i)
+        // const peak = audio.getPeakWaveformPower(buffer, 1024)
+        const sampleDuration = 0.1
+        audio.modifyWaveformPower(buffer, 0.2, Math.floor(audioBuffer.sampleRate * sampleDuration))
+    }
 
     const buttonElement = document.createElement('button')
     buttonElement.className = 'audio-button'

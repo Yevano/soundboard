@@ -1,3 +1,5 @@
+import { chunkFloat32, map, max } from "./util"
+
 export namespace audio {
     export async function load(path: string, audioContext: AudioContext): Promise<AudioBuffer> {
         return new Promise((resolve, reject) => {
@@ -197,5 +199,37 @@ export namespace audio {
             this.reverbNodes.wetGain.gain.value = wet
             this.reverbNodes.delayNode.delayTime.value = delay
         }
+    }
+
+    export function modifyWaveformPower(buffer: Float32Array, target: number, subSampleLength: number) {
+        const length = buffer.length
+        // const power = waveformPower(buffer)
+        const power = getPeakWaveformPower(buffer, subSampleLength)
+        const powerRatio = target / power
+
+        for (let i = 0; i < length; i++) {
+            buffer[i] *= powerRatio
+        }
+    }
+
+    export function getPeakWaveformPower(buffer: Float32Array, subSampleLength: number) {
+        // const chunkPowers = map(chunkFloat32(buffer, subSampleLength), waveformPower)
+        // return max(chunkPowers, (a, b) => a <= b)
+        const chunkCount = Math.floor(buffer.length / subSampleLength)
+        let peak = 0
+
+        for (let i = 0; i < chunkCount; i++) {
+            let sum = 0
+            let previousSample = 0
+            for (let j = 0; j < subSampleLength; j++) {
+                sum += Math.abs(buffer[i * subSampleLength + j] - previousSample)
+            }
+            const power = sum / subSampleLength
+            if (power > peak) {
+                peak = power
+            }
+        }
+
+        return peak
     }
 }
