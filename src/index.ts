@@ -36,6 +36,8 @@ const audioFiles: Dictionary<string[]> = {
         'Vehicular manslaughter',
         'You have lost the match',
         'You have won the match',
+        'Quack',
+        'Hawnk',
     ],
 
     'Music': [
@@ -510,7 +512,15 @@ async function start() {
         'KeyQ': controlFromName('SFX', 'Laugh Track')!,
         'KeyP': controlFromName('SFX', 'Police Siren 1')!,
         'KeyA': controlFromName('SFX', 'Gun shot 1')!,
+        'KeyL': controlFromName('SFX', 'Quack')!,
+        'KeyH': controlFromName('SFX', 'Headshot')!,
+        'KeyN': controlFromName('SFX', 'Monster kill')!,
+        'KeyG': controlFromName('SFX', 'Machine gun 1')!,
+        'KeyO': controlFromName('Memes', 'OBAMNA')!,
+        'KeyB': controlFromName('Memes', 'Bwah')!,
+        'KeyJ': controlFromName('Quotes', 'What rules')!,
         'KeyW': controlFromName('Friends', 'Youre dead')!,
+        'KeyE': controlFromName('Friends', 'Eww')!,
         'KeyM': controlFromName('Music', 'Monster Mashturbate')!,
     }
     
