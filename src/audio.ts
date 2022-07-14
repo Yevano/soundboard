@@ -151,13 +151,15 @@ export namespace audio {
         readonly audioContext: AudioContext
         readonly audioBuffer: AudioBuffer
         readonly category: string
+        readonly name: string
     
         constructor(
             buttonElement: HTMLButtonElement,
             audioContext: AudioContext,
             audioBuffer: AudioBuffer,
             output: AudioNode,
-            category: string
+            category: string,
+            name: string,
         ) {
             super(output)
             this.buttonElement = buttonElement
@@ -165,6 +167,7 @@ export namespace audio {
             this.audioBuffer = audioBuffer
             this.startTime = audioContext.currentTime
             this.category = category
+            this.name = name
         }
 
         getAudioContext(): AudioContext {

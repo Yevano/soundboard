@@ -1,7 +1,7 @@
 import { audio } from "./audio"
 import { ref, text } from "./dom"
 import { Recorder } from "./recording-bank"
-import { Color, colorFromAngle, Dictionary, flatten, max, sleep } from "./util"
+import { Color, colorFromAngle, Dictionary, filter, flatten, max, next, sleep } from "./util"
 
 const audioFiles: Dictionary<string[]> = {
     'SFX': [
@@ -16,7 +16,26 @@ const audioFiles: Dictionary<string[]> = {
         'Body Reported',
         'Emergency Meeting',
         'smash',
-        'bark4me'
+        'bark4me',
+        'Dominating',
+        'Double kill',
+        'First blood',
+        'Godlike',
+        'Headshot',
+        'Holy shit',
+        'Humiliation',
+        'Killing spree',
+        'Monster kill',
+        'Pancake',
+        'Play',
+        'Rampage',
+        'Teamkiller',
+        'Triple kill',
+        'Ultrakill',
+        'Unstoppable',
+        'Vehicular manslaughter',
+        'You have lost the match',
+        'You have won the match',
     ],
 
     'Music': [
@@ -229,6 +248,10 @@ function getSliderValue(slider: HTMLInputElement) {
     return Number.parseInt(slider.value)
 }
 
+function controlFromName(category: string, name: string) {
+    return next(filter(audioControls, c => c.category === category && c.name === name))
+}
+
 async function updateVolume() {
     const audioSlider = await volumeSliderRef.get()
     const value = getSliderValue(audioSlider) / 100
@@ -284,7 +307,7 @@ async function createAudioButton(name: string, category: string, index: number) 
     buttonTitleElement.textContent = name
     buttonElement.appendChild(buttonTitleElement)
 
-    const audioControl = new audio.AudioControl(buttonElement, globalAudioContext, audioBuffer, audioEffects.inputNode, category)
+    const audioControl = new audio.AudioControl(buttonElement, globalAudioContext, audioBuffer, audioEffects.inputNode, category, name)
 
     buttonElement.onclick = async event => {
         updateModifiers()
@@ -385,29 +408,35 @@ async function start() {
     let hue = 0
     let numCategories = categories.length
 
-    for (const category in audioFiles) {
-        const container = document.createElement('div')
-        container.className = 'category-column'
-        controlContainer.appendChild(container)
+    const soundPromise = (async () => {
+        const soundPromises: Promise<void>[] = []
 
-        const buttonGridContainer = document.createElement('div')
-        buttonGridContainer.className = 'category-column-button-grid'
-        const columnTitleElement = document.createElement('p')
-        columnTitleElement.textContent = category
-        columnTitleElement.className = 'column-title'
-        buttonGridContainer.appendChild(columnTitleElement)
-
-        container.appendChild(buttonGridContainer)
-
-        let i = 0
-
-        for (const name of audioFiles[category]) {
-            addSound(buttonGridContainer, name, category, i, colorFromAngle(hue))
-            i++;
+        for (const category in audioFiles) {
+            const container = document.createElement('div')
+            container.className = 'category-column'
+            controlContainer.appendChild(container)
+    
+            const buttonGridContainer = document.createElement('div')
+            buttonGridContainer.className = 'category-column-button-grid'
+            const columnTitleElement = document.createElement('p')
+            columnTitleElement.textContent = category
+            columnTitleElement.className = 'column-title'
+            buttonGridContainer.appendChild(columnTitleElement)
+    
+            container.appendChild(buttonGridContainer)
+    
+            let i = 0
+    
+            for (const name of audioFiles[category]) {
+                soundPromises.push(addSound(buttonGridContainer, name, category, i, colorFromAngle(hue)))
+                i++;
+            }
+    
+            hue += 2 * Math.PI / numCategories
         }
 
-        hue += 2 * Math.PI / numCategories
-    }
+        await Promise.all(soundPromises)
+    })()
 
     await initAudioSlider()
 
@@ -470,6 +499,45 @@ async function start() {
         recordingBankContainer.appendChild(buttonElement)
 
     }
+
+    console.log('awaiting sounds to load')
+
+    await soundPromise
+
+    console.log(`${audioControls.length} sounds loaded`)
+
+    const keyBinds: Dictionary<audio.AudioControl> = {
+        'KeyQ': controlFromName('SFX', 'Laugh Track')!,
+        'KeyP': controlFromName('SFX', 'Police Siren 1')!,
+        'KeyA': controlFromName('SFX', 'Gun shot 1')!,
+        'KeyW': controlFromName('Friends', 'Youre dead')!,
+        'KeyM': controlFromName('Music', 'Monster Mashturbate')!,
+    }
+    
+    addEventListener('keydown', event => {
+        const code = event.code
+        if (event.repeat) {
+            return
+        }
+        console.log(code)
+        if (code in keyBinds) {
+            const control = keyBinds[code]
+            control.play()
+        }
+    })
+
+    addEventListener('keyup', event => {
+        const code = event.code
+        if (event.repeat) {
+            return
+        }
+        if (code in keyBinds) {
+            const control = keyBinds[code]
+            if (event.shiftKey) {
+                control.stop()
+            }
+        }
+    })
 }
 
 start()
