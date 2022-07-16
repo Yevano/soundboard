@@ -4,7 +4,7 @@ export function sleep(timeMS: number) {
 	return new Promise(resolve => setTimeout(resolve, timeMS))
 }
 
-export function clamp(x: number | bigint, a: number | bigint, b: number | bigint) {
+export function clamp<T extends (number | bigint)>(x: T, a: T, b: T): T {
 	return x < a ? a : x > b ? b : x
 }
 

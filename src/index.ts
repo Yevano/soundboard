@@ -1,7 +1,7 @@
 import { audio } from "./audio"
 import { ref, text } from "./dom"
 import { Recorder } from "./recording-bank"
-import { Color, colorFromAngle, Dictionary, filter, flatten, max, next, sleep } from "./util"
+import { clamp, Color, colorFromAngle, Dictionary, filter, flatten, max, next, sleep } from "./util"
 
 const audioFiles: Dictionary<string[]> = {
     'SFX': [
@@ -74,6 +74,7 @@ const audioFiles: Dictionary<string[]> = {
         'Is mayo an instrument',
         'JPEG',
         'Bwah',
+        'Im gay',
     ],
 
     'Quotes': [
@@ -118,7 +119,6 @@ const audioFiles: Dictionary<string[]> = {
         'Sand',
         'Hip young crowd',
         'I am the law',
-        'NOOOOOOO',
         'My penis wenis',
         'Congrats on the penis',
         'Onii-chan',
@@ -147,6 +147,7 @@ const audioFiles: Dictionary<string[]> = {
         'TS You were kicked from the server',
         'TS You were moved',
         'TS You were banned',
+        'Thats how it flows',
     ],
 
     'Friends': [
@@ -187,6 +188,7 @@ const audioFiles: Dictionary<string[]> = {
         'Vindows R',
         'Yeah',
         'Ill be here all week',
+        'Who do you think me for'
     ]
 }
 
@@ -209,6 +211,74 @@ audioEffects.postGainNode.connect(globalAudioContext.destination)
 
 const recorders: Recorder[] = []
 const audioControls: audio.AudioControl[] = []
+
+class Slider {
+    readonly inputElement: HTMLInputElement
+    inputValue = 0
+    inputHandler: (value: number) => void = (_: number) => { }
+
+    constructor(inputElement: HTMLInputElement, defaultValue: number) {
+        this.inputElement = inputElement
+        this.value = defaultValue
+        inputElement.oninput = event => {
+            this.inputValue = this.getElementValue()
+            this.inputHandler(this.inputValue)
+        }
+    }
+
+    get value() {
+        return this.inputValue
+    }
+
+    set value(value: number) {
+        value = clamp(value, 0, 1)
+        this.inputValue = value
+        const minValue = Number.parseInt(this.inputElement.min)
+        const maxValue = Number.parseInt(this.inputElement.max)
+        const newValue = (maxValue - minValue) * value + minValue
+        this.inputElement.value = newValue.toString()
+        this.inputHandler(this.inputValue)
+    }
+
+    private getElementValue() {
+        const minValue = Number.parseInt(this.inputElement.min)
+        const maxValue = Number.parseInt(this.inputElement.max)
+        const inputValue = Number.parseInt(this.inputElement.value)
+        return (inputValue - minValue) / (maxValue / minValue)
+    }
+}
+
+interface ModifierSliders {
+    volumeSlider: Slider,
+    pitchSlider: Slider,
+    drySlider: Slider,
+    wetSlider: Slider,
+    delaySlider: Slider,
+}
+
+const sliderPromise: Promise<ModifierSliders> = (async () => {
+    const [
+        volumeSliderElement,
+        pitchSliderElement,
+        drySliderElement,
+        wetSliderElement,
+        delaySliderElement,
+    ] = await Promise.all([
+        volumeSliderRef.get(),
+        pitchSliderRef.get(),
+        drySliderRef.get(),
+        wetSliderRef.get(),
+        delaySliderRef.get(),
+    ])
+
+    return {
+        volumeSlider: new Slider(volumeSliderElement, 0.25),
+        pitchSlider: new Slider(pitchSliderElement, 0.5),
+        drySlider: new Slider(drySliderElement, 1),
+        wetSlider: new Slider(wetSliderElement, 0),
+        delaySlider: new Slider(delaySliderElement, 0.25),
+    }
+})()
 
 function getAudioPlayers() {
     return flatten<audio.AudioPlayer>([recorders, audioControls])
@@ -254,15 +324,12 @@ function controlFromName(category: string, name: string) {
     return next(filter(audioControls, c => c.category === category && c.name === name))
 }
 
-async function updateVolume() {
-    const audioSlider = await volumeSliderRef.get()
-    const value = getSliderValue(audioSlider) / 100
-    audioEffects.setGain(value)
+function updateVolume(volumeSlider: Slider) {
+    audioEffects.setGain(volumeSlider.value)
 }
 
-async function updatePitch() {
-    const pitchSlider = await pitchSliderRef.get()
-    let value = getSliderValue(pitchSlider) / 100
+async function updatePitch(pitchSlider: Slider) {
+    let value = pitchSlider.value
     if (value < 0.5) {
         value += 0.5
     } else {
@@ -273,22 +340,12 @@ async function updatePitch() {
     }
 }
 
-async function updateReverb() {
-    let drySlider = await drySliderRef.get()
-    let wetSlider = await wetSliderRef.get()
-    let delaySlider = await delaySliderRef.get()
-
-    const dry = getSliderValue(drySlider) / 100
-    const wet = getSliderValue(wetSlider) / 100
-    const delay = getSliderValue(delaySlider) / 100
+async function updateReverb(drySlider: Slider, wetSlider: Slider, delaySlider: Slider) {
+    const dry = drySlider.value
+    const wet = wetSlider.value
+    const delay = delaySlider.value
 
     audioEffects.setReverb(dry, wet, delay)
-}
-
-async function updateModifiers() {
-    await updateVolume()
-    await updatePitch()
-    await updateReverb()
 }
 
 async function createAudioButton(name: string, category: string, index: number) {
@@ -312,7 +369,6 @@ async function createAudioButton(name: string, category: string, index: number) 
     const audioControl = new audio.AudioControl(buttonElement, globalAudioContext, audioBuffer, audioEffects.inputNode, category, name)
 
     buttonElement.onclick = async event => {
-        updateModifiers()
         audioControl.play()
     }
 
@@ -332,37 +388,15 @@ async function addSound(controlContainer: HTMLElement, name: string, category: s
 function setSliderReset(slider: HTMLInputElement, value: string) {
     slider.oncontextmenu = async event => {
         slider.value = value
-        await updateModifiers()
     }
 }
 
-function setSliderUpdate(slider: HTMLInputElement) {
-    slider.oninput = event => { updateModifiers() }
-}
-
 async function initAudioSlider() {
-    let volumeSlider = await volumeSliderRef.get()
-    let pitchSlider = await pitchSliderRef.get()
-    let drySlider = await drySliderRef.get()
-    let wetSlider = await wetSliderRef.get()
-    let delaySlider = await delaySliderRef.get()
-    
-    await updateModifiers()
-    setSliderUpdate(volumeSlider)
-    setSliderUpdate(pitchSlider)
-    setSliderUpdate(drySlider)
-    setSliderUpdate(wetSlider)
-    setSliderUpdate(delaySlider)
-
-    setSliderReset(volumeSlider, '25')
-    setSliderReset(pitchSlider, '50')
-    setSliderReset(drySlider, '100')
-    setSliderReset(wetSlider, '0')
-    setSliderReset(delaySlider, '25')
+    const sliders = await sliderPromise
+    return sliders
 }
 
 async function playAll() {
-    updateModifiers()
     for (const control of audioControls) {
         control.play()
     }
@@ -440,7 +474,7 @@ async function start() {
         await Promise.all(soundPromises)
     })()
 
-    await initAudioSlider()
+    const sliders = await initAudioSlider()
 
     const playAllButton = await playAllRef.get()
     playAllButton.onclick = () => {
@@ -489,7 +523,6 @@ async function start() {
                 buttonElement.setAttribute('recording', 'recording')
                 recorder.record()
             } else {
-                updateModifiers()
                 recorder.play()
             }
         }
@@ -507,21 +540,73 @@ async function start() {
     await soundPromise
 
     console.log(`${audioControls.length} sounds loaded`)
+    
 
-    const keyBinds: Dictionary<audio.AudioControl> = {
+    sliders.volumeSlider.inputHandler = value => {
+        updateVolume(sliders.volumeSlider)
+    }
+
+    sliders.pitchSlider.inputHandler = value => {
+        updatePitch(sliders.pitchSlider)
+    }
+
+    sliders.drySlider.inputHandler = value => {
+        updateReverb(sliders.drySlider, sliders.wetSlider, sliders.delaySlider)
+    }
+
+    sliders.wetSlider.inputHandler = value => {
+        updateReverb(sliders.drySlider, sliders.wetSlider, sliders.delaySlider)
+    }
+
+    sliders.delaySlider.inputHandler = value => {
+        updateReverb(sliders.drySlider, sliders.wetSlider, sliders.delaySlider)
+    }
+
+    sliders.volumeSlider.value = 0.25
+    sliders.pitchSlider.value = 0.5
+    sliders.drySlider.value = 1
+    sliders.wetSlider.value = 0
+    sliders.delaySlider.value = 0.25
+
+    const keyBinds: Dictionary<audio.AudioControl | ((e: KeyboardEvent) => void)> = {
         'KeyQ': controlFromName('SFX', 'Laugh Track')!,
         'KeyP': controlFromName('SFX', 'Police Siren 1')!,
+        'BracketLeft': controlFromName('SFX', 'Police Siren 2')!,
         'KeyA': controlFromName('SFX', 'Gun shot 1')!,
         'KeyL': controlFromName('SFX', 'Quack')!,
         'KeyH': controlFromName('SFX', 'Headshot')!,
         'KeyN': controlFromName('SFX', 'Monster kill')!,
         'KeyG': controlFromName('SFX', 'Machine gun 1')!,
+        'KeyT': controlFromName('SFX', 'bark4me')!,
+        'Semicolon': controlFromName('SFX', 'Hawnk')!,
+        'KeyM': controlFromName('Music', 'Monster Mashturbate')!,
+        'KeyX': controlFromName('Music', 'STOP')!,
         'KeyO': controlFromName('Memes', 'OBAMNA')!,
         'KeyB': controlFromName('Memes', 'Bwah')!,
+        'KeyD': controlFromName('Memes', 'JPEG')!,
+        'KeyU': controlFromName('Memes', 'Im gay')!,
+        'KeyV': controlFromName('Quotes', 'Its very sad')!,
+        'KeyZ': controlFromName('Quotes', 'We Love You')!,
         'KeyJ': controlFromName('Quotes', 'What rules')!,
+        'KeyC': controlFromName('Quotes', 'Wet ass p word')!,
+        'KeyS': controlFromName('Clips', 'Sand')!,
+        'KeyR': controlFromName('Clips', 'Thats how it flows')!,
         'KeyW': controlFromName('Friends', 'Youre dead')!,
         'KeyE': controlFromName('Friends', 'Eww')!,
-        'KeyM': controlFromName('Music', 'Monster Mashturbate')!,
+        'KeyI': controlFromName('Friends', 'Yeah')!,
+        'KeyY': controlFromName('Friends', 'Kayla That feels like a self report')!,
+
+        'Minus': (e) => { sliders.volumeSlider.value -= 0.1 },
+        'Equal': (e) => { sliders.volumeSlider.value += 0.1 },
+        'Comma': (e) => { sliders.pitchSlider.value -= 0.1 },
+        'Period': (e) => { sliders.pitchSlider.value += 0.1 },
+        'Numpad7': (e) => { sliders.drySlider.value -= 0.1 },
+        'Numpad8': (e) => { sliders.drySlider.value += 0.1 },
+        'Numpad4': (e) => { sliders.wetSlider.value -= 0.1 },
+        'Numpad5': (e) => { sliders.wetSlider.value += 0.1 },
+        'Numpad1': (e) => { sliders.delaySlider.value -= 0.1 },
+        'Numpad2': (e) => { sliders.delaySlider.value += 0.1 },
+        'Digit1': e => stopAll()
     }
     
     addEventListener('keydown', event => {
@@ -532,7 +617,13 @@ async function start() {
         console.log(code)
         if (code in keyBinds) {
             const control = keyBinds[code]
-            control.play()
+            if (control instanceof Function) {
+                control(event)
+            } else if (event.shiftKey && control.currentlyPlaying) {
+                control.stop()
+            } else {
+                control.play()
+            }
         }
     })
 
@@ -543,7 +634,7 @@ async function start() {
         }
         if (code in keyBinds) {
             const control = keyBinds[code]
-            if (event.shiftKey) {
+            if (event.shiftKey && !(control instanceof Function)) {
                 control.stop()
             }
         }
