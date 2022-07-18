@@ -148,6 +148,7 @@ const audioFiles: Dictionary<string[]> = {
         'TS You were moved',
         'TS You were banned',
         'Thats how it flows',
+        'Dinosaurs are ours',
     ],
 
     'Friends': [
@@ -591,6 +592,7 @@ async function start() {
         'KeyC': controlFromName('Quotes', 'Wet ass p word')!,
         'KeyS': controlFromName('Clips', 'Sand')!,
         'KeyR': controlFromName('Clips', 'Thats how it flows')!,
+        'KeyF': controlFromName('Clips', 'Dinosaurs are ours')!,
         'KeyW': controlFromName('Friends', 'Youre dead')!,
         'KeyE': controlFromName('Friends', 'Eww')!,
         'KeyI': controlFromName('Friends', 'Yeah')!,
