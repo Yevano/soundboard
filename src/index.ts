@@ -221,7 +221,8 @@ class Slider {
     constructor(inputElement: HTMLInputElement, defaultValue: number) {
         this.inputElement = inputElement
         this.value = defaultValue
-        inputElement.oninput = event => {
+
+        inputElement.oninput = _ => {
             this.inputValue = this.getElementValue()
             this.inputHandler(this.inputValue)
         }
@@ -596,17 +597,17 @@ async function start() {
         'KeyI': controlFromName('Friends', 'Yeah')!,
         'KeyY': controlFromName('Friends', 'Kayla That feels like a self report')!,
 
-        'Minus': (e) => { sliders.volumeSlider.value -= 0.1 },
-        'Equal': (e) => { sliders.volumeSlider.value += 0.1 },
-        'Comma': (e) => { sliders.pitchSlider.value -= 0.1 },
-        'Period': (e) => { sliders.pitchSlider.value += 0.1 },
-        'Numpad7': (e) => { sliders.drySlider.value -= 0.1 },
-        'Numpad8': (e) => { sliders.drySlider.value += 0.1 },
-        'Numpad4': (e) => { sliders.wetSlider.value -= 0.1 },
-        'Numpad5': (e) => { sliders.wetSlider.value += 0.1 },
-        'Numpad1': (e) => { sliders.delaySlider.value -= 0.1 },
-        'Numpad2': (e) => { sliders.delaySlider.value += 0.1 },
-        'Digit1': e => stopAll()
+        'Minus': _ => { sliders.volumeSlider.value -= 0.1 },
+        'Equal': _ => { sliders.volumeSlider.value += 0.1 },
+        'Comma': _ => { sliders.pitchSlider.value -= 0.1 },
+        'Period': _ => { sliders.pitchSlider.value += 0.1 },
+        'Numpad7': _ => { sliders.drySlider.value -= 0.1 },
+        'Numpad8': _ => { sliders.drySlider.value += 0.1 },
+        'Numpad4': _ => { sliders.wetSlider.value -= 0.1 },
+        'Numpad5': _ => { sliders.wetSlider.value += 0.1 },
+        'Numpad1': _ => { sliders.delaySlider.value -= 0.1 },
+        'Numpad2': _ => { sliders.delaySlider.value += 0.1 },
+        'Digit1': _ => stopAll()
     }
     
     addEventListener('keydown', event => {
