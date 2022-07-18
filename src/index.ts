@@ -225,6 +225,10 @@ class Slider {
             this.inputValue = this.getElementValue()
             this.inputHandler(this.inputValue)
         }
+
+        inputElement.oncontextmenu = _ => {
+            this.value = defaultValue
+        }
     }
 
     get value() {
@@ -245,7 +249,7 @@ class Slider {
         const minValue = Number.parseInt(this.inputElement.min)
         const maxValue = Number.parseInt(this.inputElement.max)
         const inputValue = Number.parseInt(this.inputElement.value)
-        return (inputValue - minValue) / (maxValue / minValue)
+        return (inputValue - minValue) / (maxValue - minValue)
     }
 }
 
@@ -384,12 +388,6 @@ async function addSound(controlContainer: HTMLElement, name: string, category: s
     let audioControl = await createAudioButton(name, category, index)
     controlContainer.appendChild(audioControl.buttonElement)
     audioControls.push(audioControl)
-}
-
-function setSliderReset(slider: HTMLInputElement, value: string) {
-    slider.oncontextmenu = async event => {
-        slider.value = value
-    }
 }
 
 async function initAudioSlider() {
