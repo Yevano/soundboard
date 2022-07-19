@@ -623,17 +623,24 @@ async function start() {
         if (event.repeat) {
             return
         }
+        
         console.log(code)
         if (code in keyBinds) {
+            event.preventDefault()
             const control = keyBinds[code]
+
+            if (control instanceof Recorder) {
+                if (event.altKey && !control.currentlyRecording) {
+                    control.record()
+                    return
+                } else if (control.currentlyRecording) {
+                    control.stopRecording()
+                    return
+                }
+            }
+
             if (control instanceof Function) {
                 control(event)
-            } else if (control instanceof Recorder && event.ctrlKey) {
-                if (control.currentlyRecording) {
-                    control.stopRecording()
-                } else {
-                    control.record()
-                }
             } else if (event.shiftKey && control.currentlyPlaying) {
                 control.stop()
             } else {

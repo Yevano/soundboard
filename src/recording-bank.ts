@@ -1,4 +1,5 @@
 import { audio } from "./audio"
+import { count, map } from "./util"
 
 export class Recorder extends audio.AudioBufferSourcePlayer {
     readonly mediaStreamDestination: MediaStreamAudioDestinationNode
@@ -41,6 +42,7 @@ export class Recorder extends audio.AudioBufferSourcePlayer {
             const buffer = await event.data.arrayBuffer()
             this.audioBuffer = await this.audioContext.decodeAudioData(buffer)
             console.log('Data decoded')
+            this.trimStart()
         }
     }
 
@@ -51,6 +53,39 @@ export class Recorder extends audio.AudioBufferSourcePlayer {
 
         this.mediaRecorder.stop()
         this.currentlyRecording = false
+    }
+
+    private trimStart() {
+        const channelCount = this.audioBuffer.numberOfChannels
+        const buffers = Array.from(map(count(channelCount), this.audioBuffer.getChannelData.bind(this.audioBuffer)))
+        const length = this.audioBuffer.length
+
+        let startOffset
+        loop:
+        for (startOffset = 0; startOffset < length; startOffset++) {
+            for (const buffer of buffers) {
+                if (Math.abs(buffer[startOffset]) > 1e-20) {
+                    console.log(buffer[startOffset - 1])
+                    break loop
+                }
+            }
+        }
+
+        if (startOffset !== 0) {
+            startOffset--
+        }
+
+        console.log(`${startOffset} / ${length}`)
+        const newBufferLength = length - startOffset
+
+        const newAudioBuffer = this.audioContext.createBuffer(channelCount, newBufferLength, this.audioBuffer.sampleRate)
+        
+        for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
+            const newBuffer = newAudioBuffer.getChannelData(channelIndex)
+            this.audioBuffer.copyFromChannel(newBuffer, channelIndex, startOffset)
+        }
+
+        this.audioBuffer = newAudioBuffer
     }
 
     getBuffer() {

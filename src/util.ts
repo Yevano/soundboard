@@ -16,6 +16,12 @@ export function* iterableOf<A>(xs: Iterator<A>) {
 	}
 }
 
+export function* count(length: number) {
+	for (let i = 0; i < length; i++) {
+		yield i
+	}
+}
+
 export function* map<A, B>(xs: Iterable<A>, f: (x: A) => B): Generator<B> {
 	for (const x of xs) {
 		yield f(x)
