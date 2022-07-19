@@ -58,6 +58,7 @@ export namespace audio {
         getOutput(): AudioNode
         get loopMode(): boolean
         set loopMode(mode: boolean)
+        get currentlyPlaying(): boolean
     }
 
     export abstract class AudioBufferSourcePlayer implements AudioPlayer {

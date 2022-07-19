@@ -329,7 +329,7 @@ function getSliderValue(slider: HTMLInputElement) {
     return Number.parseInt(slider.value)
 }
 
-function controlFromName(category: string, name: string) {
+function controlFromName(category: string, name: string): audio.AudioPlayer | undefined {
     return next(filter(audioControls, c => c.category === category && c.name === name))
 }
 
@@ -571,7 +571,7 @@ async function start() {
     sliders.wetSlider.value = 0
     sliders.delaySlider.value = 0.25
 
-    const keyBinds: Dictionary<audio.AudioControl | ((e: KeyboardEvent) => void)> = {
+    const keyBinds: Dictionary<audio.AudioPlayer | ((e: KeyboardEvent) => void)> = {
         'KeyQ': controlFromName('SFX', 'Laugh Track')!,
         'KeyP': controlFromName('SFX', 'Police Siren 1')!,
         'BracketLeft': controlFromName('SFX', 'Police Siren 2')!,
@@ -601,17 +601,25 @@ async function start() {
         'KeyI': controlFromName('Friends', 'Yeah')!,
         'KeyY': controlFromName('Friends', 'Kayla That feels like a self report')!,
 
+        'Digit1': recorders[0],
+        'Digit2': recorders[1],
+        'Digit3': recorders[2],
+        'Digit4': recorders[3],
+
         'Minus': _ => { sliders.volumeSlider.value -= 0.1 },
         'Equal': _ => { sliders.volumeSlider.value += 0.1 },
         'Comma': _ => { sliders.pitchSlider.value -= 0.1 },
         'Period': _ => { sliders.pitchSlider.value += 0.1 },
+
         'Numpad7': _ => { sliders.drySlider.value -= 0.1 },
         'Numpad8': _ => { sliders.drySlider.value += 0.1 },
         'Numpad4': _ => { sliders.wetSlider.value -= 0.1 },
         'Numpad5': _ => { sliders.wetSlider.value += 0.1 },
         'Numpad1': _ => { sliders.delaySlider.value -= 0.1 },
         'Numpad2': _ => { sliders.delaySlider.value += 0.1 },
-        'Digit1': _ => stopAll()
+        
+        'Digit0': _ => stopAll()
+
     }
     
     addEventListener('keydown', event => {
