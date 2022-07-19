@@ -225,7 +225,9 @@ export namespace audio {
             let sum = 0
             let previousSample = 0
             for (let j = 0; j < subSampleLength; j++) {
-                sum += Math.abs(buffer[i * subSampleLength + j] - previousSample)
+                const sample = buffer[i * subSampleLength + j]
+                sum += Math.abs(sample - previousSample)
+                previousSample = sample
             }
             const power = sum / subSampleLength
             if (power > peak) {
