@@ -217,25 +217,77 @@ export namespace audio {
     }
 
     export function getPeakWaveformPower(buffer: Float32Array, subSampleLength: number) {
-        // const chunkPowers = map(chunkFloat32(buffer, subSampleLength), waveformPower)
-        // return max(chunkPowers, (a, b) => a <= b)
         const chunkCount = Math.floor(buffer.length / subSampleLength)
         let peak = 0
 
         for (let i = 0; i < chunkCount; i++) {
-            let sum = 0
-            let previousSample = 0
-            for (let j = 0; j < subSampleLength; j++) {
-                const sample = buffer[i * subSampleLength + j]
-                sum += Math.abs(sample - previousSample)
-                previousSample = sample
-            }
-            const power = sum / subSampleLength
+            const power = getWaveformPower(buffer, subSampleLength * i, subSampleLength)
+
             if (power > peak) {
                 peak = power
             }
         }
 
         return peak
+    }
+
+    export function getWaveformPower(buffer: Float32Array, offset: number, length: number) {
+        let sum = 0
+        let previousSample = 0
+        const endOffset = offset + length
+        for (let i = offset; i < endOffset; i++) {
+            const sample = buffer[i]
+            sum += Math.abs(sample - previousSample)
+            previousSample = sample
+        }
+        return sum / length
+    }
+
+    export function normalize(buffer: Float32Array, targetLevel: number, windowLength: number) {
+        const rms = getPeakRMS(buffer, targetLevel, 0, buffer.length, windowLength)
+        for (let i = 0; i < buffer.length; i++) {
+            buffer[i] *= rms
+        }
+    }
+
+    export function getPeakRMS(buffer: Float32Array, targetLevel: number, offset: number, length: number, windowLength: number) {
+        if (windowLength > length - offset) {
+            windowLength = length - offset
+        }
+
+        const r = 10 ** (targetLevel / 10)
+
+        let sumSquares = 0
+        
+        for (let i = offset; i < offset + windowLength; i++) {
+            sumSquares += buffer[i] ** 2
+        }
+
+        let peakSumSquares = sumSquares
+
+        for (let slidingOffset = offset + 1; slidingOffset < length - windowLength; slidingOffset++) {
+            sumSquares -= buffer[slidingOffset - 1] ** 2
+            sumSquares += buffer[slidingOffset + windowLength] ** 2
+
+            if (sumSquares > peakSumSquares) {
+                peakSumSquares = sumSquares
+            }
+        }
+
+        return Math.sqrt((windowLength * r ** 2) / peakSumSquares)
+    }
+
+    export function getRMS(buffer: Float32Array, targetLevel: number, offset: number, length: number) {
+        const r = 10 ** (targetLevel / 10)
+        return Math.sqrt((length * r ** 2) / sumOfSquares(buffer, offset, length))
+    }
+
+    export function sumOfSquares(buffer: Float32Array, offset: number, length: number) {
+        let sum = 0
+        const endOffset = offset + length
+        for (let i = offset; i < endOffset; i++) {
+            sum += buffer[i] ** 2
+        }
+        return sum
     }
 }

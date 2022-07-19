@@ -325,10 +325,6 @@ function animate() {
 
 requestAnimationFrame(animate)
 
-function getSliderValue(slider: HTMLInputElement) {
-    return Number.parseInt(slider.value)
-}
-
 function controlFromName(category: string, name: string): audio.AudioPlayer | undefined {
     return next(filter(audioControls, c => c.category === category && c.name === name))
 }
@@ -362,9 +358,9 @@ async function createAudioButton(name: string, category: string, index: number) 
 
     for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
         const buffer = audioBuffer.getChannelData(i)
-        // const peak = audio.getPeakWaveformPower(buffer, 1024)
         const sampleDuration = 0.1
-        audio.modifyWaveformPower(buffer, 0.2, Math.floor(audioBuffer.sampleRate * sampleDuration))
+        const targetVolume = 0
+        audio.normalize(buffer, targetVolume, audioBuffer.sampleRate * sampleDuration)
     }
 
     const buttonElement = document.createElement('button')
@@ -565,7 +561,7 @@ async function start() {
         updateReverb(sliders.drySlider, sliders.wetSlider, sliders.delaySlider)
     }
 
-    sliders.volumeSlider.value = 0.25
+    sliders.volumeSlider.value = 0.15
     sliders.pitchSlider.value = 0.5
     sliders.drySlider.value = 1
     sliders.wetSlider.value = 0
@@ -632,6 +628,12 @@ async function start() {
             const control = keyBinds[code]
             if (control instanceof Function) {
                 control(event)
+            } else if (control instanceof Recorder && event.ctrlKey) {
+                if (control.currentlyRecording) {
+                    control.stopRecording()
+                } else {
+                    control.record()
+                }
             } else if (event.shiftKey && control.currentlyPlaying) {
                 control.stop()
             } else {
