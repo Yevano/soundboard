@@ -53,6 +53,10 @@ const audioFiles: Dictionary<string[]> = {
         'Monster Mashturbate',
         'Crazy Bong',
         'Crazy Bark',
+        'Cool alright',
+        'If I mess up my dads gonna beat me',
+        'You sit on your ass',
+        'Not alright',
     ],
 
     'Memes': [
@@ -152,6 +156,13 @@ const audioFiles: Dictionary<string[]> = {
         'My favorite big booty Latina',
         'GAS',
         'America deserved 911',
+        'Get wrist control',
+        'Pull out your gun',
+        'He wants your money to buy crack',
+        'Thats when I pull out my gun',
+        'Ring ring the schoolbell',
+        'My names Brian I like to skateboard',
+        'What an idiot',
     ],
 
     'Friends': [
@@ -561,7 +572,7 @@ async function start() {
         updateReverb(sliders.drySlider, sliders.wetSlider, sliders.delaySlider)
     }
 
-    sliders.volumeSlider.value = 0.15
+    sliders.volumeSlider.value = 0.05
     sliders.pitchSlider.value = 0.5
     sliders.drySlider.value = 1
     sliders.wetSlider.value = 0
