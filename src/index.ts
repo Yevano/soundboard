@@ -203,7 +203,8 @@ const audioFiles: Dictionary<string[]> = {
         'Vindows R',
         'Yeah',
         'Ill be here all week',
-        'Who do you think me for'
+        'Who do you think me for',
+        'Yes',
     ]
 }
 
@@ -605,7 +606,7 @@ async function start() {
         'KeyG': controlFromName('Clips', 'GAS')!,
         'KeyW': controlFromName('Friends', 'Youre dead')!,
         'KeyE': controlFromName('Friends', 'Eww')!,
-        'KeyI': controlFromName('Friends', 'Yeah')!,
+        'KeyI': controlFromName('Friends', 'Yes')!,
         'KeyY': controlFromName('Friends', 'Kayla That feels like a self report')!,
 
         'Digit1': recorders[0],
