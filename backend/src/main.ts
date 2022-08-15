@@ -1,4 +1,5 @@
 import express from 'express'
+import cors from 'cors'
 import { Dir, Dirent, existsSync, fstat } from 'node:fs'
 import { FileHandle, mkdir, open, opendir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -7,6 +8,9 @@ import multer from 'multer'
 import { FileMeta, StoreMeta } from './webapi-types'
 
 const app = express()
+app.use(cors({
+    origin: '*'
+}))
 const audioDirPath = 'store/audio'
 const storage = multer.diskStorage({ destination: audioDirPath })
 const storeAudio = multer({ storage })
@@ -61,7 +65,6 @@ async function initStore() {
 
 app.get('/list-audio', async (req, res) => {
     const meta = await getStoreMeta()
-    res.append('Access-Control-Allow-Origin', '*')
     res.send(JSON.stringify(meta.fileMetas))
 })
 
@@ -69,7 +72,6 @@ app.get('/get-audio/:name', async (req, res) => {
     const audioFileName = req.params.name
     const absolutePath = path.resolve(`${audioDirPath}/${audioFileName}`)
     console.log(`Send file: ${absolutePath}`)
-    res.append('Access-Control-Allow-Origin', '*')
     res.sendFile(absolutePath)
 })
 
@@ -78,8 +80,6 @@ app.post('/put-audio/:name', storeAudio.single('recording'), async (req, res) =>
     
     console.log(req.file)
     const storageFile = req.file
-
-    res.append('Access-Control-Allow-Origin', '*')
 
     if (storageFile === undefined) {
         res.json({ error: 'error' })
