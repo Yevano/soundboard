@@ -1,0 +1,7 @@
+{
+    "extends": "@tsconfig/node16/tsconfig.json",
+    "compilerOptions": {
+        "rootDirs": ["./src", "../shared/types"],
+    },
+    "exclude": ["node_modules"],
+}
