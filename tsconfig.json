@@ -1,11 +1,11 @@
 {
   "compilerOptions": {
     "target": "es6",
-    "rootDir": "./src",
+    "rootDirs": ["./src", "../shared/types"],
     "sourceMap": true,
     "module": "commonjs",
     "strict": true,
     "skipLibCheck": true,
-    "lib": ["es5", "es6", "dom"]
+    "lib": ["es5", "es6", "dom"],
   }
 }

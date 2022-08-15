@@ -61,7 +61,7 @@ export function create<K extends keyof HTMLElementTagNameMap>(
 ) {
     const element = document.createElement(tagName)
     for (const [key, value] of kvs(attrs)) {
-        element.setAttribute('key', value.toString())
+        element.setAttribute(key, value.toString())
     }
     for (const child of children) {
         element.appendChild(child)
@@ -76,4 +76,93 @@ export function text<K extends keyof HTMLElementTagNameMap>(
     const result = document.createElement(tagName)
     result.textContent = text
     return result
+}
+
+export class Tooltip {
+    readonly parent: HTMLElement
+    readonly relativeElement: HTMLDivElement
+    readonly element: HTMLDivElement
+    readonly messageElement: HTMLParagraphElement
+
+    constructor(element: HTMLElement) {
+        this.parent = element
+
+        this.relativeElement = create('div', { }, e => {
+            e.style.position = 'absolute'
+            e.style.display = 'none'
+        })
+
+        this.messageElement = text('p', '')
+        this.messageElement.style.color = 'black'
+
+        this.element = create('div', { }, e => {
+            e.style.position = 'absolute'
+            e.style.bottom = '4em'
+            e.style.backgroundColor = 'rgba(255, 255, 255, 0.75)'
+            e.style.borderRadius = '0.5em'
+            e.style.padding = '0.5em'
+            this.relativeElement.appendChild(e)
+        }, this.messageElement)
+
+        this.parent.appendChild(this.relativeElement)
+    }
+
+    show(message: string) {
+        this.messageElement.textContent = message
+        this.relativeElement.style.display = ''
+        moveRelativeInsideViewport(this.element)
+    }
+
+    hide() {
+        this.relativeElement.style.display = 'none'
+    }
+}
+
+// TODO: This is really wrong but it works right now.
+export function moveRelativeInsideViewport(element: HTMLElement, viewport = window.visualViewport) {
+    let rect = element.getBoundingClientRect()
+    let parentRect = (element.parentElement || document.body).getBoundingClientRect()
+    if (rect.left < viewport.pageLeft) {
+        let leftRelativeToParent = rect.left - parentRect.left
+        const leftRelativeToPage = rect.left - viewport.pageLeft
+        leftRelativeToParent -= leftRelativeToPage
+        element.style.left = `${leftRelativeToParent}px`
+        rect = element.getBoundingClientRect()
+    }
+
+    if (rect.top < viewport.pageTop) {
+        let topRelativeToParent = rect.top - parentRect.top
+        const topRelativeToPage = rect.top - viewport.pageTop
+        topRelativeToParent -= topRelativeToPage
+        element.style.top = `${topRelativeToParent}px`
+        rect = element.getBoundingClientRect()
+    }
+
+    if (rect.right > viewport.width) {
+        console.log(rect.right, parentRect.right, viewport.width)
+        let rightRelativeToParent = rect.right - parentRect.right
+        const rightRelativeToPage = rect.right - viewport.width
+        console.log(rightRelativeToParent, rightRelativeToPage)
+        rightRelativeToParent -= rightRelativeToPage
+        element.style.left = ''
+        element.style.right = `-${rightRelativeToParent}px`
+        rect = element.getBoundingClientRect()
+    }
+
+    if (rect.bottom > viewport.height) {
+        let bottomRelativeToParent = rect.bottom - parentRect.bottom
+        const bottomRelativeToPage = rect.bottom - viewport.height
+        bottomRelativeToParent -= bottomRelativeToPage
+        element.style.bottom = `${bottomRelativeToParent}px`
+    }
+}
+
+export function showTooltip(message: string, element: HTMLElement) {
+    // const tooltipDiv = document.createElement('div')
+    const tooltipDiv = create('div', { }, e => {
+        e.style.position = 'absolute'
+        element.appendChild(e)
+    }, text('p', message))
+
+    return tooltipDiv
 }

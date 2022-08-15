@@ -1,7 +1,11 @@
 import { audio } from "./audio"
-import { ref, text } from "./dom"
+import { create, ref, showTooltip, text, Tooltip } from "./dom"
+import { isKeyDown } from "./keyboard"
 import { Recorder } from "./recording-bank"
 import { clamp, Color, colorFromAngle, Dictionary, filter, flatten, max, next, sleep } from "./util"
+import { getAudioBuffer, getAudioList, putAudioFile } from "./webapi"
+import { CustomWindow, globalThis } from './global'
+import { Modal } from "./modal"
 
 const audioFiles: Dictionary<string[]> = {
     'SFX': [
@@ -38,6 +42,25 @@ const audioFiles: Dictionary<string[]> = {
         'You have won the match',
         'Quack',
         'Hawnk',
+        'Oof',
+        'TS Banned',
+        'TS Beep beep',
+        'TS Connection lost',
+        'TS Error',
+        'TS Hey wake up',
+        'TS Insufficient',
+        'TS See you soon',
+        'TS Sound muted',
+        'TS Sound resumed',
+        'TS User entered',
+        'TS User joined',
+        'TS User left',
+        'TS Welcome back',
+        'TS Welcome to TeamSpeak',
+        'TS You were kicked from the channel',
+        'TS You were kicked from the server',
+        'TS You were moved',
+        'TS You were banned',
     ],
 
     'Music': [
@@ -111,7 +134,11 @@ const audioFiles: Dictionary<string[]> = {
         'What rules',
         'Who cancels who',
         'Very Stable',
-        'YoureABunchaPussies'
+        'YoureABunchaPussies',
+        'Cut them off',
+        'Breasts',
+        'There are feminine boys',
+        'Murder is legal',
     ],
     
     'Clips': [
@@ -133,24 +160,6 @@ const audioFiles: Dictionary<string[]> = {
         'wee woo',
         'Future',
         'SUPNERDS',
-        'TS Banned',
-        'TS Beep beep',
-        'TS Connection lost',
-        'TS Error',
-        'TS Hey wake up',
-        'TS Insufficient',
-        'TS See you soon',
-        'TS Sound muted',
-        'TS Sound resumed',
-        'TS User entered',
-        'TS User joined',
-        'TS User left',
-        'TS Welcome back',
-        'TS Welcome to TeamSpeak',
-        'TS You were kicked from the channel',
-        'TS You were kicked from the server',
-        'TS You were moved',
-        'TS You were banned',
         'Thats how it flows',
         'Dinosaurs are ours',
         'My favorite big booty Latina',
@@ -163,6 +172,16 @@ const audioFiles: Dictionary<string[]> = {
         'Ring ring the schoolbell',
         'My names Brian I like to skateboard',
         'What an idiot',
+        'Murder time fun time',
+        'jermaThing',
+        'Am I alive',
+        'Whats going on',
+        'Monopoly over the phone',
+        'Whats that on TV',
+        'I buy porn everytime I go to the hotel',
+        'Bitches',
+        'Bye bye',
+        'You are matched',
     ],
 
     'Friends': [
@@ -293,7 +312,7 @@ const sliderPromise: Promise<ModifierSliders> = (async () => {
     ])
 
     return {
-        volumeSlider: new Slider(volumeSliderElement, 0.25),
+        volumeSlider: new Slider(volumeSliderElement, 0.05),
         pitchSlider: new Slider(pitchSliderElement, 0.5),
         drySlider: new Slider(drySliderElement, 1),
         wetSlider: new Slider(wetSliderElement, 0),
@@ -337,8 +356,12 @@ function animate() {
 
 requestAnimationFrame(animate)
 
-function controlFromName(category: string, name: string): audio.AudioPlayer | undefined {
+function controlFromClipAndName(category: string, name: string): audio.AudioPlayer | undefined {
     return next(filter(audioControls, c => c.category === category && c.name === name))
+}
+
+function controlFromName(name: string): audio.AudioPlayer | undefined {
+    return next(filter(audioControls, c => c.name === name))
 }
 
 function updateVolume(volumeSlider: Slider) {
@@ -366,7 +389,7 @@ async function updateReverb(drySlider: Slider, wetSlider: Slider, delaySlider: S
 }
 
 async function createAudioButton(name: string, category: string, index: number) {
-    const audioBuffer = await audio.load(`../audio/${name}.mp3`, globalAudioContext)
+    const audioBuffer = await getAudioBuffer(`${name}.mp3`, globalAudioContext)
 
     for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
         const buffer = audioBuffer.getChannelData(i)
@@ -391,6 +414,20 @@ async function createAudioButton(name: string, category: string, index: number) 
 
     buttonElement.oncontextmenu = async event => {
         audioControl.stop()
+    }
+
+    const tooltip = new Tooltip(buttonElement)
+    tooltip.messageElement.style.fontSize = '2em'
+    tooltip.messageElement.style.userSelect = 'none'
+
+    buttonElement.onmouseenter = event => {
+        tooltip.show(name)
+        // buttonTitleElement.style.overflow = 'visible'
+    }
+
+    buttonElement.onmouseleave = event => {
+        tooltip.hide()
+        // buttonTitleElement.style.overflow = 'hidden'
     }
 
     return audioControl
@@ -440,6 +477,11 @@ function* categoriesIter() {
         yield category
     }
 }
+
+type BindValue
+= audio.AudioPlayer
+| ((e: KeyboardEvent) => void)
+| audio.AudioPlayer[]
 
 async function start() {
     document.oncontextmenu = event => {
@@ -579,35 +621,37 @@ async function start() {
     sliders.wetSlider.value = 0
     sliders.delaySlider.value = 0.25
 
-    const keyBinds: Dictionary<audio.AudioPlayer | ((e: KeyboardEvent) => void)> = {
-        'KeyQ': controlFromName('SFX', 'Laugh Track')!,
-        'KeyP': controlFromName('SFX', 'Police Siren 1')!,
-        'BracketLeft': controlFromName('SFX', 'Police Siren 2')!,
-        'KeyA': controlFromName('SFX', 'Gun shot 1')!,
-        'KeyL': controlFromName('SFX', 'Quack')!,
-        'KeyH': controlFromName('SFX', 'Headshot')!,
-        'KeyN': controlFromName('SFX', 'Monster kill')!,
-        'KeyT': controlFromName('SFX', 'bark4me')!,
-        'Semicolon': controlFromName('SFX', 'Hawnk')!,
-        'KeyM': controlFromName('Music', 'Monster Mashturbate')!,
-        'KeyX': controlFromName('Music', 'STOP')!,
-        'KeyO': controlFromName('Memes', 'OBAMNA')!,
-        'KeyB': controlFromName('Memes', 'Bwah')!,
-        'KeyD': controlFromName('Memes', 'JPEG')!,
-        'KeyU': controlFromName('Memes', 'Im gay')!,
-        'KeyV': controlFromName('Quotes', 'Its very sad')!,
-        'KeyZ': controlFromName('Quotes', 'We Love You')!,
-        'KeyJ': controlFromName('Quotes', 'What rules')!,
-        'KeyC': controlFromName('Quotes', 'Wet ass p word')!,
-        'KeyS': controlFromName('Clips', 'Sand')!,
-        'KeyR': controlFromName('Clips', 'Thats how it flows')!,
-        'KeyF': controlFromName('Clips', 'Dinosaurs are ours')!,
-        'KeyK': controlFromName('Clips', 'My favorite big booty Latina')!,
-        'KeyG': controlFromName('Clips', 'GAS')!,
-        'KeyW': controlFromName('Friends', 'Youre dead')!,
-        'KeyE': controlFromName('Friends', 'Eww')!,
-        'KeyI': controlFromName('Friends', 'Yes')!,
-        'KeyY': controlFromName('Friends', 'Kayla That feels like a self report')!,
+    let overrideKeyBinds = false
+
+    const keyBinds: Dictionary<BindValue> = {
+        'KeyQ': controlFromName('Laugh Track')!,
+        'KeyP': controlFromName('Police Siren 1')!,
+        'BracketLeft': controlFromName('Police Siren 2')!,
+        'KeyA': controlFromName('Gun shot 1')!,
+        'KeyL': controlFromName('Quack')!,
+        'KeyH': controlFromName('Headshot')!,
+        'KeyN': [controlFromName('Monster kill')!, controlFromName('Not alright')!],
+        'KeyT': [controlFromName('bark4me')!, controlFromName('Bitches')!],
+        'Semicolon': controlFromName('Hawnk')!,
+        'KeyM': [controlFromName('Monster Mashturbate')!, controlFromName('Murder is legal')!],
+        'KeyX': controlFromName('STOP')!,
+        'KeyO': controlFromName('OBAMNA')!,
+        'KeyB': [controlFromName('Bwah')!, controlFromName('Breasts')!],
+        'KeyD': controlFromName('Bye bye')!,
+        'KeyU': controlFromName('Im gay')!,
+        'KeyV': controlFromName('Its very sad')!,
+        'KeyZ': controlFromName('We Love You')!,
+        'KeyJ': controlFromName('What rules')!,
+        'KeyC': controlFromName('Wet ass p word')!,
+        'KeyS': controlFromName('Sand')!,
+        'KeyR': [controlFromName('Thats how it flows')!, controlFromName('Ring ring the schoolbell')!],
+        'KeyF': controlFromName('Dinosaurs are ours')!,
+        'KeyK': controlFromName('My favorite big booty Latina')!,
+        'KeyG': controlFromName('GAS')!,
+        'KeyW': [controlFromName('Youre dead')!, controlFromName('What an idiot')!],
+        'KeyE': controlFromName('Eww')!,
+        'KeyI': controlFromName('Yes')!,
+        'KeyY': controlFromName('Not alright')!,
 
         'Digit1': recorders[0],
         'Digit2': recorders[1],
@@ -629,8 +673,23 @@ async function start() {
         'Digit0': _ => stopAll()
 
     }
+
+    const dropzone = document.getElementById('dropzone')!
     
     addEventListener('keydown', event => {
+        if (event.code === 'F' && event.ctrlKey) {
+            event.preventDefault()
+            // openSearch()
+            return
+        }
+
+        if (overrideKeyBinds) {
+            return
+        }
+        if (event.code === 'Space') {
+            event.preventDefault()
+        }
+
         const code = event.code
         if (event.repeat) {
             return
@@ -653,15 +712,28 @@ async function start() {
 
             if (control instanceof Function) {
                 control(event)
-            } else if (event.shiftKey && control.currentlyPlaying) {
-                control.stop()
             } else {
-                control.play()
+                let selectedControl: audio.AudioPlayer
+                if (control instanceof Array) {
+                    const i = isKeyDown('Space') ? 1 : 0
+                    selectedControl = control[i]
+                } else {
+                    selectedControl = control
+                }
+
+                if (event.shiftKey && selectedControl.currentlyPlaying) {
+                    selectedControl.stop()
+                } else {
+                    selectedControl.play()
+                }
             }
         }
     })
 
     addEventListener('keyup', event => {
+        if (overrideKeyBinds) {
+            return
+        }
         const code = event.code
         if (event.repeat) {
             return
@@ -669,10 +741,115 @@ async function start() {
         if (code in keyBinds) {
             const control = keyBinds[code]
             if (event.shiftKey && !(control instanceof Function)) {
-                control.stop()
+                if (control instanceof Array) {
+                    control[isKeyDown('Space') ? 1 : 0].stop()
+                } else {
+                    control.stop()
+                }
             }
         }
     })
+
+    console.log(document.body)
+  
+    let fileDraggedOver = false
+
+    const modal = new Modal<string>(dropzone)
+
+    document.body.ondragover = event => {
+        event.stopPropagation()
+        event.preventDefault()
+
+        if (fileDraggedOver) {
+            return
+        }
+
+        fileDraggedOver = true
+        dropzone.style.visibility = 'visible'
+        dropzone.style.opacity = '0.5'
+        console.log('dragged over')
+    }
+
+    dropzone.ondragleave = event => {
+        console.log('leave')
+        event.stopPropagation()
+        event.preventDefault()
+        fileDraggedOver = false
+        dropzone.style.visibility = 'hidden'
+        dropzone.style.opacity = '0'
+    }
+
+    dropzone.ondrop = async event => {
+        event.stopPropagation()
+        event.preventDefault()
+        dropzone.style.visibility = 'hidden'
+        dropzone.style.opacity = '0'
+        console.log('drop')
+        fileDraggedOver = false
+
+        const doFileItem = async (file: File) => {
+            console.log(`File name: ${file.name}`)
+            const fileName = await modal.show(element => {
+                dropzone.style.visibility = 'visible'
+                dropzone.style.opacity = '1'
+                overrideKeyBinds = true
+                return new Promise<string>(resolve => {
+                    element.appendChild(create('div', { },
+                        container => {
+                            const s = container.style
+                            s.display = 'flex'
+                            s.flexDirection = 'column'
+                            s.alignItems = 'center'
+                            s.justifyContent = 'center'
+                            s.position = 'relative'
+                            s.width = '100vw'
+                            s.height = '100vh'
+                        },
+                        create('p', { }, p => {
+                            p.innerText = 'Enter file name'
+                            p.style.color = 'white'
+                        }),
+                        create('input', { type: 'text' }, e => {
+                            e.onkeydown = event => {
+                                if (event.code !== 'Enter') {
+                                    return
+                                }
+                                console.log(e.value)
+                                e.onkeydown = null
+                                dropzone.style.visibility = 'hidden'
+                                dropzone.style.opacity = '0'
+                                resolve(e.value)
+                            }
+                        })
+                    ))
+                })
+            })
+
+            overrideKeyBinds = false
+
+            await putAudioFile(fileName, file)
+        }
+
+        const dataTransfer = event.dataTransfer
+        if (!dataTransfer) {
+            console.log('no event.dataTransfer')
+            return
+        }
+
+        for (let i = 0; i < dataTransfer.items.length; i++) {
+            const item = dataTransfer.items[i]
+            console.log(item)
+            if (item.kind !== 'file') {
+                continue
+            }
+            const file = item.getAsFile()
+            if (file) {
+                await doFileItem(item.getAsFile()!)
+            } else {
+                console.log('item.getAsFile() returned null')
+            }
+        }
+    }
 }
 
 start()

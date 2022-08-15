@@ -1,5 +1,6 @@
 import { audio } from "./audio"
 import { count, map } from "./util"
+import { putAudio, putEncodedAudio } from "./webapi"
 
 export class Recorder extends audio.AudioBufferSourcePlayer {
     readonly mediaStreamDestination: MediaStreamAudioDestinationNode
@@ -40,8 +41,9 @@ export class Recorder extends audio.AudioBufferSourcePlayer {
         this.mediaRecorder.ondataavailable = async (event) => {
             console.log('Got data from recorder')
             const buffer = await event.data.arrayBuffer()
+            const response = await putEncodedAudio(`recording-${this.index}`, buffer)
             this.audioBuffer = await this.audioContext.decodeAudioData(buffer)
-            console.log('Data decoded')
+            console.log(response)
             this.trimStart()
         }
     }
