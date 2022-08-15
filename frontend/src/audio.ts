@@ -49,6 +49,113 @@ export namespace audio {
         }
     }
 
+    export class AdvancedReverb {
+        readonly effect: ConvolverNode
+        readonly preDelay: DelayNode
+        readonly multitap: DelayNode[]
+        reverbTime = 1
+        attack = 0
+        release = 1 / 3
+        preDelayTime = 0.001
+        multitapGain: GainNode
+        inputGain: GainNode
+        outputGain: GainNode
+        wet: GainNode
+
+        constructor(readonly context: AudioContext) {
+            this.inputGain = this.context.createGain()
+            this.inputGain.gain.value = 1
+            this.outputGain = this.context.createGain()
+            this.outputGain.gain.value = 1
+            this.effect = this.context.createConvolver()
+            this.preDelay = this.context.createDelay(this.reverbTime)
+            this.preDelay.delayTime.setValueAtTime(this.preDelayTime, this.context.currentTime)
+            this.multitap = []
+            
+            for (let i = 2; i > 0; i--) {
+                this.multitap.push(this.context.createDelay(this.reverbTime))
+            }
+
+            this.multitap.map((t, i) => {
+                if (this.multitap[i + 1]) {
+                    t.connect(this.multitap[i + 1])
+                }
+                t.delayTime.setValueAtTime(0.001 + i * (this.preDelayTime / 2), this.context.currentTime)
+            })
+
+            this.multitapGain = this.context.createGain()
+            this.multitap[this.multitap.length - 1].connect(this.multitapGain)
+            this.multitapGain.gain.value = 0.2
+
+            this.multitapGain.connect(this.outputGain)
+            this.wet = this.context.createGain()
+        
+            this.inputGain.connect(this.wet)
+            this.wet.connect(this.preDelay)
+            this.wet.connect(this.multitap[0])
+            this.preDelay.connect(this.effect)
+            this.effect.connect(this.outputGain)
+            this.inputGain.connect(this.outputGain)
+
+            this.renderTail()
+        }
+
+        renderTail() {
+            const tailContext = new OfflineAudioContext(
+                2, this.context.sampleRate * this.reverbTime, this.context.sampleRate
+            )
+
+            const tailOsc = new Noise(tailContext)
+            const tailOscGain = tailContext.createGain()
+            const tailLPFilter = new BiquadFilterNode(tailContext, { type: 'lowpass' })
+            tailLPFilter.frequency.value = 5000
+            const tailHPFilter = new BiquadFilterNode(tailContext, { type: 'highpass' })
+            tailHPFilter.frequency.value = 500
+
+            tailOsc.output.connect(tailOscGain)
+            tailOscGain.gain.setValueAtTime(1, tailContext.currentTime)
+            tailOscGain.gain.linearRampToValueAtTime(0, tailContext.currentTime + this.reverbTime)
+            tailOscGain.connect(tailHPFilter)
+            tailHPFilter.connect(tailLPFilter)
+            tailLPFilter.connect(tailContext.destination)
+            
+            setTimeout(async () => {
+                const buffer = await tailContext.startRendering()
+                this.effect.buffer = buffer
+            }, 20)
+        }
+    }
+
+    export class Noise {
+        static noiseBuffer: AudioBuffer
+        static noiseSource: AudioBufferSourceNode
+
+        static initNoiseBuffer(context: BaseAudioContext) {
+            const bufferSize = 2 * context.sampleRate
+            this.noiseBuffer = context.createBuffer(1, bufferSize, context.sampleRate)
+            const channel = this.noiseBuffer.getChannelData(0)
+
+            for (let i = 0; i < bufferSize; i++) {
+                channel[i] = Math.random() * 2 - 1
+            }
+
+            this.noiseSource = context.createBufferSource()
+            this.noiseSource.buffer = this.noiseBuffer
+            this.noiseSource.loop = true
+            this.noiseSource.start(0)
+        }
+
+        readonly output: AudioNode
+
+        constructor(readonly context: BaseAudioContext) {
+            if (Noise.noiseBuffer === undefined) {
+                Noise.initNoiseBuffer(context)
+            }
+
+            this.output = Noise.noiseSource
+        }
+    }
+
     export interface AudioPlayer {
         play(): void
         stop(): void
@@ -185,11 +292,15 @@ export namespace audio {
         readonly preGainNode: GainNode
         readonly postGainNode: GainNode
         readonly reverbNodes: ReverbNodes
+        readonly advancedReverb: AdvancedReverb
 
         constructor(readonly audioContext: AudioContext) {
             this.inputNode = audioContext.createGain()
             this.preGainNode = audioContext.createGain()
             this.postGainNode = audioContext.createGain()
+            this.advancedReverb = new AdvancedReverb(audioContext)
+            this.inputNode.connect(this.advancedReverb.inputGain)
+            // this.reverbNodes = connectReverb(audioContext, this.advancedReverb.outputGain, this.preGainNode)
             this.reverbNodes = connectReverb(audioContext, this.inputNode, this.preGainNode)
             this.preGainNode.connect(this.postGainNode)
         }
