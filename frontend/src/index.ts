@@ -80,6 +80,7 @@ const audioFiles: Dictionary<string[]> = {
         'If I mess up my dads gonna beat me',
         'You sit on your ass',
         'Not alright',
+        'You blocked me on facebook',
     ],
 
     'Memes': [
@@ -139,6 +140,9 @@ const audioFiles: Dictionary<string[]> = {
         'Breasts',
         'There are feminine boys',
         'Murder is legal',
+        'Stop it get some help',
+        'STOP THE HAMMERING',
+        'You have been stopped',
     ],
     
     'Clips': [
@@ -182,6 +186,8 @@ const audioFiles: Dictionary<string[]> = {
         'Bitches',
         'Bye bye',
         'You are matched',
+        'Crap',
+        'transgender',
     ],
 
     'Friends': [
@@ -224,6 +230,7 @@ const audioFiles: Dictionary<string[]> = {
         'Ill be here all week',
         'Who do you think me for',
         'Yes',
+        'Im calling the cop'
     ]
 }
 
@@ -560,7 +567,7 @@ async function start() {
 
     const recordingBankContainer = await recordingBankContainerRef.get()
     
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 10; i++) {
         const buttonElement = document.createElement('button')
         const recorder = new Recorder(buttonElement, i, globalAudioContext, audioEffects.preGainNode, audioEffects.inputNode)
         recorders.push(recorder)
@@ -624,17 +631,18 @@ async function start() {
     let overrideKeyBinds = false
 
     const keyBinds: Dictionary<BindValue> = {
-        'KeyQ': controlFromName('Laugh Track')!,
+        'KeyQ': [controlFromName('Laugh Track')!, controlFromName('Windows 95 Error')!],
         'KeyP': controlFromName('Police Siren 1')!,
         'BracketLeft': controlFromName('Police Siren 2')!,
+        'BracketRight': controlFromName('Im calling the cop')!,
         'KeyA': controlFromName('Gun shot 1')!,
         'KeyL': controlFromName('Quack')!,
         'KeyH': controlFromName('Headshot')!,
-        'KeyN': [controlFromName('Monster kill')!, controlFromName('Not alright')!],
+        'KeyN': [controlFromName('Nononononono')!, controlFromName('Not alright')!],
         'KeyT': [controlFromName('bark4me')!, controlFromName('Bitches')!],
         'Semicolon': controlFromName('Hawnk')!,
-        'KeyM': [controlFromName('Monster Mashturbate')!, controlFromName('Murder is legal')!],
-        'KeyX': controlFromName('STOP')!,
+        'KeyM': [controlFromName('Stop it get some help')!, controlFromName('Murder is legal')!],
+        'KeyX': [controlFromName('STOP')!, controlFromName('STOP THE HAMMERING')!],
         'KeyO': controlFromName('OBAMNA')!,
         'KeyB': [controlFromName('Bwah')!, controlFromName('Breasts')!],
         'KeyD': controlFromName('Bye bye')!,
@@ -642,8 +650,8 @@ async function start() {
         'KeyV': controlFromName('Its very sad')!,
         'KeyZ': controlFromName('We Love You')!,
         'KeyJ': controlFromName('What rules')!,
-        'KeyC': controlFromName('Wet ass p word')!,
-        'KeyS': controlFromName('Sand')!,
+        'KeyC': [controlFromName('jermaThing')!, controlFromName('Wet ass p word')!],
+        'KeyS': controlFromName('Oof')!,
         'KeyR': [controlFromName('Thats how it flows')!, controlFromName('Ring ring the schoolbell')!],
         'KeyF': controlFromName('Dinosaurs are ours')!,
         'KeyK': controlFromName('My favorite big booty Latina')!,
@@ -652,11 +660,18 @@ async function start() {
         'KeyE': controlFromName('Eww')!,
         'KeyI': controlFromName('Yes')!,
         'KeyY': controlFromName('Not alright')!,
+        'Insert': controlFromName('Crap')!,
 
         'Digit1': recorders[0],
         'Digit2': recorders[1],
         'Digit3': recorders[2],
         'Digit4': recorders[3],
+        'Digit5': recorders[4],
+        'Digit6': recorders[5],
+        'Digit7': recorders[6],
+        'Digit8': recorders[7],
+        'Digit9': recorders[8],
+        'Digit0': recorders[9],
 
         'Minus': _ => { sliders.volumeSlider.value -= 0.1 },
         'Equal': _ => { sliders.volumeSlider.value += 0.1 },
@@ -670,7 +685,7 @@ async function start() {
         'Numpad1': _ => { sliders.delaySlider.value -= 0.1 },
         'Numpad2': _ => { sliders.delaySlider.value += 0.1 },
         
-        'Digit0': _ => stopAll()
+        'End': _ => stopAll()
 
     }
 
@@ -849,6 +864,12 @@ async function start() {
                 console.log('item.getAsFile() returned null')
             }
         }
+    }
+
+    try {
+        const userMedia = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch (e) {
+        console.log('error getting user device:', e)
     }
 }
 
