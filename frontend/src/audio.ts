@@ -60,6 +60,7 @@ export namespace audio {
         multitapGain: GainNode
         inputGain: GainNode
         outputGain: GainNode
+        dryGainModifier: GainNode
         wet: GainNode
 
         constructor(readonly context: AudioContext) {
@@ -67,6 +68,8 @@ export namespace audio {
             this.inputGain.gain.value = 1
             this.outputGain = this.context.createGain()
             this.outputGain.gain.value = 1
+            this.dryGainModifier = this.context.createGain()
+            this.dryGainModifier.gain.value = 1
             this.effect = this.context.createConvolver()
             this.preDelay = this.context.createDelay(this.reverbTime)
             this.preDelay.delayTime.setValueAtTime(this.preDelayTime, this.context.currentTime)
@@ -89,15 +92,31 @@ export namespace audio {
 
             this.multitapGain.connect(this.outputGain)
             this.wet = this.context.createGain()
-        
+
             this.inputGain.connect(this.wet)
+
             this.wet.connect(this.preDelay)
             this.wet.connect(this.multitap[0])
+
             this.preDelay.connect(this.effect)
             this.effect.connect(this.outputGain)
-            this.inputGain.connect(this.outputGain)
+
+            // Modify the gain of the dry signal
+            this.inputGain.connect(this.dryGainModifier)
+            this.dryGainModifier.connect(this.outputGain)
 
             this.renderTail()
+        }
+
+        updatePreDelayTime(preDelayTime: number) {
+            this.preDelayTime = preDelayTime
+            this.preDelay.delayTime.setValueAtTime(this.preDelayTime, this.context.currentTime)
+            this.multitap.map((t, i) => {
+                if (this.multitap[i + 1]) {
+                    t.connect(this.multitap[i + 1])
+                }
+                t.delayTime.setValueAtTime(0.001 + i * (this.preDelayTime / 2), this.context.currentTime)
+            })
         }
 
         renderTail() {
@@ -291,7 +310,7 @@ export namespace audio {
         readonly inputNode: GainNode
         readonly preGainNode: GainNode
         readonly postGainNode: GainNode
-        readonly reverbNodes: ReverbNodes
+        // readonly reverbNodes: ReverbNodes
         readonly advancedReverb: AdvancedReverb
 
         constructor(readonly audioContext: AudioContext) {
@@ -301,7 +320,8 @@ export namespace audio {
             this.advancedReverb = new AdvancedReverb(audioContext)
             this.inputNode.connect(this.advancedReverb.inputGain)
             // this.reverbNodes = connectReverb(audioContext, this.advancedReverb.outputGain, this.preGainNode)
-            this.reverbNodes = connectReverb(audioContext, this.inputNode, this.preGainNode)
+            // this.reverbNodes = connectReverb(audioContext, this.inputNode, this.preGainNode)
+            this.advancedReverb.outputGain.connect(this.preGainNode)
             this.preGainNode.connect(this.postGainNode)
         }
 
@@ -310,9 +330,15 @@ export namespace audio {
         }
 
         setReverb(dry: number, wet: number, delay: number): void {
-            this.reverbNodes.dryGain.gain.value = dry
+            /* this.reverbNodes.dryGain.gain.value = dry
             this.reverbNodes.wetGain.gain.value = wet
-            this.reverbNodes.delayNode.delayTime.value = delay
+            this.reverbNodes.delayNode.delayTime.value = delay */
+            this.advancedReverb.dryGainModifier.gain.value = dry
+            this.advancedReverb.wet.gain.value = wet
+
+            if (delay !== this.advancedReverb.preDelayTime) {
+                this.advancedReverb.updatePreDelayTime(delay)
+            }
         }
     }
 
