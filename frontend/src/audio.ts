@@ -49,20 +49,6 @@ export namespace audio {
         }
     }
 
-    interface ReverbSource {
-        delayNode: DelayNode,
-        gainNode: GainNode,
-        noiseEffect: Noise,
-        signalMultiplierNode: AudioWorkletNode,
-        noiseGainNode: GainNode,
-    }
-
-    interface ParamByFrequency {
-        high: number,
-        mid: number,
-        low: number
-    }
-
     interface MultiplyParamMap extends AudioParamMap {
         get(key: string): AudioParam | undefined
         get(key: 'coefficient'): AudioParam
@@ -74,6 +60,63 @@ export namespace audio {
 
     function createMultiplyNode(context: AudioContext): MultiplyNode {
         return new AudioWorkletNode(context, 'multiply-processor') as MultiplyNode
+    }
+
+    export class FeedbackCombFilter {
+        readonly inputNode: AudioNode
+        readonly outputNode: AudioNode
+        readonly delayTime: AudioParam
+        readonly feedbackCoefficient: AudioParam
+        readonly outputCoefficient: AudioParam
+
+        constructor(context: AudioContext) {
+            const inputAddNode = context.createGain()
+            const delayNode = context.createDelay()
+            const feedbackMultiplyNode = createMultiplyNode(context)
+            const outputMultiplyNode = createMultiplyNode(context)
+            this.inputNode = inputAddNode
+            this.outputNode = outputMultiplyNode
+
+            this.delayTime = delayNode.delayTime
+            this.feedbackCoefficient = feedbackMultiplyNode.parameters.get('coefficient')!
+            this.outputCoefficient = outputMultiplyNode.parameters.get('coefficient')!
+
+            inputAddNode.connect(delayNode)
+            inputAddNode.connect(outputMultiplyNode)
+            delayNode.connect(feedbackMultiplyNode)
+            feedbackMultiplyNode.connect(inputAddNode)
+        }
+    }
+
+    export class LPFeedbackCombFilter {
+        readonly inputNode: AudioNode
+        readonly outputNode: AudioNode
+        readonly delayTime: AudioParam
+        readonly feedbackCoefficient: AudioParam
+        readonly outputCoefficient: AudioParam
+        readonly frequency: AudioParam
+
+        constructor(context: AudioContext) {
+            const inputAddNode = context.createGain()
+            const delayNode = context.createDelay()
+            const feedbackMultiplyNode = createMultiplyNode(context)
+            const outputMultiplyNode = createMultiplyNode(context)
+            const lowPassNode = context.createBiquadFilter()
+            this.inputNode = inputAddNode
+            this.outputNode = outputMultiplyNode
+            
+            lowPassNode.type = 'lowpass'
+            this.frequency = lowPassNode.frequency
+            this.delayTime = delayNode.delayTime
+            this.feedbackCoefficient = feedbackMultiplyNode.parameters.get('coefficient')!
+            this.outputCoefficient = outputMultiplyNode.parameters.get('coefficient')!
+
+            inputAddNode.connect(delayNode)
+            inputAddNode.connect(outputMultiplyNode)
+            delayNode.connect(lowPassNode)
+            lowPassNode.connect(feedbackMultiplyNode)
+            feedbackMultiplyNode.connect(inputAddNode)
+        }
     }
 
     export class SchroederAllPass {
@@ -110,6 +153,7 @@ export namespace audio {
 
     export class SchroederReverberator {
         readonly inputNode: AudioNode
+        readonly reverbTime: AudioParam
         readonly outA: AudioNode
         readonly outB: MultiplyNode
         readonly outC: MultiplyNode
@@ -131,11 +175,15 @@ export namespace audio {
             const s2 = context.createGain()
             const negateS2 = createMultiplyNode(context)
 
+            const lowPassNode = context.createBiquadFilter()
+            const reverbTimeNode = context.createConstantSource()
+            
+            this.reverbTime = reverbTimeNode.offset
+
             this.outA = context.createGain()
             this.outB = createMultiplyNode(context)
             this.outC = createMultiplyNode(context)
             this.outD = context.createGain()
-
 
             ap1.coefficient.value = 0.7
             ap1.delayTime.value = 347 / sampleRate
@@ -156,6 +204,96 @@ export namespace audio {
             fbcf4.delayTime.value = 2251 / sampleRate
             fbcf4.outputCoefficient.value = 1
             fbcf4.feedbackCoefficient.value = 0.733
+
+            negateS2.parameters.get('coefficient').value = -1
+
+            this.outB.parameters.get('coefficient').value = -1
+            this.outC.parameters.get('coefficient').value = -1
+
+            lowPassNode.type = 'lowpass'
+            lowPassNode.frequency.value = 500
+
+            ap1.outputNode.connect(ap2.inputNode)
+            ap2.outputNode.connect(ap3.inputNode)
+            lowPassNode.connect(fbcf1.inputNode)
+            lowPassNode.connect(fbcf2.inputNode)
+            lowPassNode.connect(fbcf3.inputNode)
+            lowPassNode.connect(fbcf4.inputNode)
+
+            ap3.outputNode.connect(lowPassNode)
+
+            fbcf1.outputNode.connect(s1)
+            fbcf3.outputNode.connect(s1)
+            fbcf2.outputNode.connect(s2)
+            fbcf4.outputNode.connect(s2)
+
+            s1.connect(this.outA)
+            s2.connect(this.outA)
+            this.outA.connect(this.outB)
+            this.outD.connect(this.outC)
+            s1.connect(this.outD)
+            negateS2.connect(this.outD)
+            
+            this.inputNode = ap1.inputNode
+        }
+    }
+
+    export class LPSchroederReverberator {
+        readonly inputNode: AudioNode
+        readonly reverbTime: AudioParam
+        readonly outA: AudioNode
+        readonly outB: MultiplyNode
+        readonly outC: MultiplyNode
+        readonly outD: AudioNode
+
+        constructor(context: AudioContext) {
+            const { sampleRate } = context
+            
+            const ap1 = new SchroederAllPass(context)
+            const ap2 = new SchroederAllPass(context)
+            const ap3 = new SchroederAllPass(context)
+
+            const fbcf1 = new LPFeedbackCombFilter(context)
+            const fbcf2 = new LPFeedbackCombFilter(context)
+            const fbcf3 = new LPFeedbackCombFilter(context)
+            const fbcf4 = new LPFeedbackCombFilter(context)
+
+            const s1 = context.createGain()
+            const s2 = context.createGain()
+            const negateS2 = createMultiplyNode(context)
+
+            const reverbTimeNode = context.createConstantSource()
+            
+            this.reverbTime = reverbTimeNode.offset
+
+            this.outA = context.createGain()
+            this.outB = createMultiplyNode(context)
+            this.outC = createMultiplyNode(context)
+            this.outD = context.createGain()
+
+            ap1.coefficient.value = 0.7
+            ap1.delayTime.value = 347 / sampleRate
+            ap2.coefficient.value = 0.7
+            ap2.delayTime.value = 113 / sampleRate
+            ap3.coefficient.value = 0.7
+            ap3.delayTime.value = 37 / sampleRate
+
+            fbcf1.delayTime.value = 1687 / sampleRate
+            fbcf1.outputCoefficient.value = 1
+            fbcf1.feedbackCoefficient.value = 0.773
+            fbcf1.frequency.value = 1000
+            fbcf2.delayTime.value = 1601 / sampleRate
+            fbcf2.outputCoefficient.value = 1
+            fbcf2.feedbackCoefficient.value = 0.802
+            fbcf2.frequency.value = 1000
+            fbcf3.delayTime.value = 2053 / sampleRate
+            fbcf3.outputCoefficient.value = 1
+            fbcf3.feedbackCoefficient.value = 0.753
+            fbcf3.frequency.value = 1000
+            fbcf4.delayTime.value = 2251 / sampleRate
+            fbcf4.outputCoefficient.value = 1
+            fbcf4.feedbackCoefficient.value = 0.733
+            fbcf4.frequency.value = 1000
 
             negateS2.parameters.get('coefficient').value = -1
 
@@ -186,33 +324,7 @@ export namespace audio {
         }
     }
 
-    export class FeedbackCombFilter {
-        readonly inputNode: AudioNode
-        readonly outputNode: AudioNode
-        readonly delayTime: AudioParam
-        readonly feedbackCoefficient: AudioParam
-        readonly outputCoefficient: AudioParam
-
-        constructor(context: AudioContext) {
-            const inputAddNode = context.createGain()
-            const delayNode = context.createDelay()
-            const feedbackMultiplyNode = createMultiplyNode(context)
-            const outputMultiplyNode = createMultiplyNode(context)
-            this.inputNode = inputAddNode
-            this.outputNode = outputMultiplyNode
-
-            this.delayTime = delayNode.delayTime
-            this.feedbackCoefficient = feedbackMultiplyNode.parameters.get('coefficient')!
-            this.outputCoefficient = outputMultiplyNode.parameters.get('coefficient')!
-
-            inputAddNode.connect(delayNode)
-            inputAddNode.connect(outputMultiplyNode)
-            delayNode.connect(feedbackMultiplyNode)
-            feedbackMultiplyNode.connect(inputAddNode)
-        }
-    }
-
-    export class PhysicalReverb {
+    export class SchroederReverb {
         readonly inputNode: GainNode
         readonly outputNode: GainNode
         readonly dryGain: AudioParam
@@ -241,129 +353,32 @@ export namespace audio {
         }
     }
 
-    export class AdvancedReverb {
-        readonly effect: ConvolverNode
-        readonly preDelay: DelayNode
-        readonly multitap: DelayNode[]
-        reverbTime = 1
-        attack = 0
-        release = 1 / 3
-        preDelayTime = 0.001
-        multitapGain: GainNode
-        inputGain: GainNode
-        outputGain: GainNode
-        dryGainModifier: GainNode
-        wet: GainNode
+    export class LPSchroederReverb {
+        readonly inputNode: GainNode
+        readonly outputNode: GainNode
+        readonly dryGain: AudioParam
+        readonly wetGain: AudioParam
 
-        constructor(readonly context: AudioContext) {
-            this.inputGain = this.context.createGain()
-            this.inputGain.gain.value = 1
-            this.outputGain = this.context.createGain()
-            this.outputGain.gain.value = 1
-            this.dryGainModifier = this.context.createGain()
-            this.dryGainModifier.gain.value = 1
-            this.effect = this.context.createConvolver()
-            this.preDelay = this.context.createDelay(this.reverbTime)
-            this.preDelay.delayTime.setValueAtTime(this.preDelayTime, this.context.currentTime)
-            this.multitap = []
-            
-            for (let i = 2; i > 0; i--) {
-                this.multitap.push(this.context.createDelay(this.reverbTime))
-            }
+        constructor(context: AudioContext) {
+            this.inputNode = context.createGain()
+            this.outputNode = context.createGain()
+            const dryGainNode = context.createGain()
+            const wetGainNode = context.createGain()
+            const reverberator = new LPSchroederReverberator(context)
+            const merger = context.createChannelMerger(4)
 
-            this.multitap.map((t, i) => {
-                if (this.multitap[i + 1]) {
-                    t.connect(this.multitap[i + 1])
-                }
-                t.delayTime.setValueAtTime(0.001 + i * (this.preDelayTime / 2), this.context.currentTime)
-            })
+            this.dryGain = dryGainNode.gain
+            this.wetGain = wetGainNode.gain
 
-            this.multitapGain = this.context.createGain()
-            this.multitap[this.multitap.length - 1].connect(this.multitapGain)
-            this.multitapGain.gain.value = 0.2
-
-            this.multitapGain.connect(this.outputGain)
-            this.wet = this.context.createGain()
-
-            this.inputGain.connect(this.wet)
-
-            this.wet.connect(this.preDelay)
-            this.wet.connect(this.multitap[0])
-
-            this.preDelay.connect(this.effect)
-            this.effect.connect(this.outputGain)
-
-            // Modify the gain of the dry signal
-            this.inputGain.connect(this.dryGainModifier)
-            this.dryGainModifier.connect(this.outputGain)
-
-            this.renderTail()
-        }
-
-        updatePreDelayTime(preDelayTime: number) {
-            this.preDelayTime = preDelayTime
-            this.preDelay.delayTime.setValueAtTime(this.preDelayTime, this.context.currentTime)
-            this.multitap.map((t, i) => {
-                if (this.multitap[i + 1]) {
-                    t.connect(this.multitap[i + 1])
-                }
-                t.delayTime.setValueAtTime(0.001 + i * (this.preDelayTime / 2), this.context.currentTime)
-            })
-        }
-
-        renderTail() {
-            const tailContext = new OfflineAudioContext(
-                2, this.context.sampleRate * this.reverbTime, this.context.sampleRate
-            )
-
-            const tailOsc = new Noise(tailContext)
-            const tailOscGain = tailContext.createGain()
-            const tailLPFilter = new BiquadFilterNode(tailContext, { type: 'lowpass' })
-            tailLPFilter.frequency.value = 5000
-            const tailHPFilter = new BiquadFilterNode(tailContext, { type: 'highpass' })
-            tailHPFilter.frequency.value = 500
-
-            tailOsc.output.connect(tailOscGain)
-            tailOscGain.gain.setValueAtTime(1, tailContext.currentTime)
-            tailOscGain.gain.linearRampToValueAtTime(0, tailContext.currentTime + this.reverbTime)
-            tailOscGain.connect(tailHPFilter)
-            tailHPFilter.connect(tailLPFilter)
-            tailLPFilter.connect(tailContext.destination)
-            
-            setTimeout(async () => {
-                const buffer = await tailContext.startRendering()
-                this.effect.buffer = buffer
-            }, 20)
-        }
-    }
-
-    export class Noise {
-        static noiseBuffer: AudioBuffer
-        static noiseSource: AudioBufferSourceNode
-
-        static initNoiseBuffer(context: BaseAudioContext) {
-            const bufferSize = 2 * context.sampleRate
-            this.noiseBuffer = context.createBuffer(1, bufferSize, context.sampleRate)
-            const channel = this.noiseBuffer.getChannelData(0)
-
-            for (let i = 0; i < bufferSize; i++) {
-                channel[i] = Math.random() * 2 - 1
-            }
-
-            this.noiseSource = context.createBufferSource()
-            this.noiseSource.buffer = this.noiseBuffer
-            this.noiseSource.loop = true
-            this.noiseSource.start(0)
-        }
-
-        readonly output: AudioNode
-
-        constructor(readonly context: BaseAudioContext) {
-            if (Noise.noiseBuffer === undefined) {
-                Noise.initNoiseBuffer(context)
-            }
-
-            this.output = Noise.noiseSource
+            this.inputNode.connect(dryGainNode)
+            this.inputNode.connect(wetGainNode)
+            dryGainNode.connect(this.outputNode)
+            wetGainNode.connect(reverberator.inputNode)
+            reverberator.outA.connect(merger, 0, 0)
+            reverberator.outB.connect(merger, 0, 1)
+            reverberator.outC.connect(merger, 0, 0)
+            reverberator.outD.connect(merger, 0, 1)
+            merger.connect(this.outputNode)
         }
     }
 
@@ -502,16 +517,13 @@ export namespace audio {
         readonly inputNode: GainNode
         readonly preGainNode: GainNode
         readonly postGainNode: GainNode
-        // readonly reverbNodes: ReverbNodes
-        readonly advancedReverb: AdvancedReverb
-        readonly physicalReverb: PhysicalReverb
+        readonly physicalReverb: SchroederReverb
 
         constructor(readonly audioContext: AudioContext) {
             this.inputNode = audioContext.createGain()
             this.preGainNode = audioContext.createGain()
             this.postGainNode = audioContext.createGain()
-            this.advancedReverb = new AdvancedReverb(audioContext)
-            this.physicalReverb = new PhysicalReverb(audioContext)
+            this.physicalReverb = new SchroederReverb(audioContext)
             // this.physicalReverb.earlyReflectionsTime.value = 1
             this.inputNode.connect(this.physicalReverb.inputNode)
             this.physicalReverb.outputNode.connect(this.preGainNode)
