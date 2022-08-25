@@ -28,7 +28,7 @@ export function* map<A, B>(xs: Iterable<A>, f: (x: A) => B): Generator<B> {
 	}
 }
 
-export function* flatten<A>(xss: Iterable<Iterable<A>>): Generator<A> {
+export function* flatten<A>(xss: Iterable<Iterable<A>> | A[][]): Generator<A> {
 	for (const xs of xss) {
 		for (const x of xs) {
 			yield x
@@ -40,6 +40,14 @@ export function* flatMap<A, B>(xs: Iterable<A>, f: (x: A) => Iterable<B>): Gener
 	for (const x of xs) {
 		for (const y of f(x)) {
 			yield y
+		}
+	}
+}
+
+export function* product<A, B>(xs: Iterable<A>, ys: Iterable<B>): Generator<[A, B]> {
+	for (const x of xs) {
+		for (const y of ys) {
+			yield [x, y]
 		}
 	}
 }

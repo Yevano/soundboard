@@ -6,6 +6,8 @@ import { clamp, Color, colorFromAngle, Dictionary, filter, flatten, max, next, s
 import { getAudioBuffer, getAudioList, putAudioFile } from "./webapi"
 import { CustomWindow, globalThis } from './global'
 import { Modal } from "./modal"
+// import signalMultiplierWorkletURL from 'worklet-loader!./audio-worklets/signal-multiplier-processor.worklet.ts'
+import { WorkerUrl } from 'worker-url'
 
 const audioFiles: Dictionary<string[]> = {
     'SFX': [
@@ -248,8 +250,7 @@ const recordingBankContainerRef = ref<HTMLDivElement>('recording-bank')
 
 const globalAudioContext = new AudioContext()
 
-const audioEffects = new audio.AudioEffects(globalAudioContext)
-audioEffects.postGainNode.connect(globalAudioContext.destination)
+let audioEffects!: audio.AudioEffects
 
 const recorders: Recorder[] = []
 const audioControls: audio.AudioControl[] = []
@@ -494,6 +495,24 @@ async function start() {
     document.oncontextmenu = event => {
         event.preventDefault()
     }
+
+    const signalMultiplierWorkletURL = new WorkerUrl(
+        new URL('./audio-worklets/signal-multiplier-processor.ts', import.meta.url), {
+            name: 'signal-multiplier-processor'
+        }
+    )
+
+    const biasWorkletURL = new WorkerUrl(
+        new URL('./audio-worklets/multiply-processor.ts', import.meta.url), {
+            name: 'multiply-processor'
+        }
+    )
+
+    await globalAudioContext.audioWorklet.addModule(signalMultiplierWorkletURL)
+    await globalAudioContext.audioWorklet.addModule(biasWorkletURL)
+
+    audioEffects = new audio.AudioEffects(globalAudioContext)
+    audioEffects.postGainNode.connect(globalAudioContext.destination)
 
     const categories = Array.from(categoriesIter())
     const audioEntries = Array.from(audioFilesIter())
