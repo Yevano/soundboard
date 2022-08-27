@@ -483,7 +483,7 @@ export namespace audio {
     export class AudioControl extends AudioBufferSourcePlayer {
         readonly buttonElement: HTMLButtonElement
         readonly audioContext: AudioContext
-        readonly audioBuffer: AudioBuffer
+        private audioBuffer: AudioBuffer
         readonly category: string
         readonly name: string
     
@@ -510,6 +510,10 @@ export namespace audio {
 
         getAudioBuffer(): AudioBuffer {
             return this.audioBuffer
+        }
+
+        setAudioBuffer(audioBuffer: AudioBuffer) {
+            this.audioBuffer = audioBuffer
         }
     }
 

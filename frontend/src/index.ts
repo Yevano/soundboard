@@ -2,7 +2,7 @@ import { audio } from "./audio"
 import { create, ref, showTooltip, text, Tooltip } from "./dom"
 import { isKeyDown } from "./keyboard"
 import { Recorder } from "./recording-bank"
-import { clamp, Color, colorFromAngle, Dictionary, filter, flatten, max, next, sleep } from "./util"
+import { clamp, Color, colorFromAngle, Dictionary, doAsync, filter, flatten, max, next, sleep } from "./util"
 import { getAudioBuffer, getAudioList, putAudioFile } from "./webapi"
 import { CustomWindow, globalThis } from './global'
 import { Modal } from "./modal"
@@ -396,16 +396,9 @@ async function updateReverb(drySlider: Slider, wetSlider: Slider, delaySlider: S
     audioEffects.setReverb(dry, wet, delay)
 }
 
+const emptyBuffer = globalAudioContext.createBuffer(2, 1, 44100)
+
 async function createAudioButton(name: string, category: string, index: number) {
-    const audioBuffer = await getAudioBuffer(`${name}.mp3`, globalAudioContext)
-
-    for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
-        const buffer = audioBuffer.getChannelData(i)
-        const sampleDuration = 0.1
-        const targetVolume = 0
-        audio.normalize(buffer, targetVolume, audioBuffer.sampleRate * sampleDuration)
-    }
-
     const buttonElement = document.createElement('button')
     buttonElement.className = 'audio-button'
     buttonElement.setAttribute('pressed', '')
@@ -414,7 +407,22 @@ async function createAudioButton(name: string, category: string, index: number) 
     buttonTitleElement.textContent = name
     buttonElement.appendChild(buttonTitleElement)
 
-    const audioControl = new audio.AudioControl(buttonElement, globalAudioContext, audioBuffer, audioEffects.inputNode, category, name)
+    const audioControl = new audio.AudioControl(
+        buttonElement, globalAudioContext, emptyBuffer, audioEffects.inputNode, category, name
+    )
+
+    doAsync(async () => {
+        const audioBuffer = await getAudioBuffer(`${name}.mp3`, globalAudioContext)
+
+        for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+            const buffer = audioBuffer.getChannelData(i)
+            const sampleDuration = 0.1
+            const targetVolume = 0
+            audio.normalize(buffer, targetVolume, audioBuffer.sampleRate * sampleDuration)
+        }
+
+        audioControl.setAudioBuffer(audioBuffer)
+    })
 
     buttonElement.onclick = async event => {
         audioControl.play()
@@ -613,13 +621,6 @@ async function start() {
         recordingBankContainer.appendChild(buttonElement)
 
     }
-
-    console.log('awaiting sounds to load')
-
-    await soundPromise
-
-    console.log(`${audioControls.length} sounds loaded`)
-    
 
     sliders.volumeSlider.inputHandler = value => {
         updateVolume(sliders.volumeSlider)
@@ -890,6 +891,12 @@ async function start() {
     } catch (e) {
         console.log('error getting user device:', e)
     }
+
+    console.log('awaiting sounds to load')
+
+    await soundPromise
+
+    console.log(`${audioControls.length} sounds loaded`)
 }
 
 start()

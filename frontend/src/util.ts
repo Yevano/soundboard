@@ -153,9 +153,13 @@ export function colorFromAngle(t: number) {
 	return new Color(2 - t3OverTau, 0, t3OverTau - 2)
 }
 
+export function doAsync<T>(f: () => Promise<T>) {
+	f()
+}
+
 export class AsyncValue<T extends { } | null> {
 	private value: T | undefined
-	private resolveValue!: (value: T) => void
+	private resolveValue!: <A extends T>(value: A) => void
 	private valuePromise: Promise<T> = this.newValuePromise()
 
 	private newValuePromise() {
