@@ -484,13 +484,13 @@ export namespace audio {
         readonly buttonElement: HTMLButtonElement
         readonly audioContext: AudioContext
         private audioBuffer: AudioBuffer
+        private audioInitialized = false
         readonly category: string
         readonly name: string
     
         constructor(
             buttonElement: HTMLButtonElement,
             audioContext: AudioContext,
-            audioBuffer: AudioBuffer,
             output: AudioNode,
             category: string,
             name: string,
@@ -498,7 +498,7 @@ export namespace audio {
             super(output)
             this.buttonElement = buttonElement
             this.audioContext = audioContext
-            this.audioBuffer = audioBuffer
+            this.audioBuffer = audioContext.createBuffer(2, 1, 44100)
             this.startTime = audioContext.currentTime
             this.category = category
             this.name = name
@@ -513,7 +513,12 @@ export namespace audio {
         }
 
         setAudioBuffer(audioBuffer: AudioBuffer) {
+            this.audioInitialized = true
             this.audioBuffer = audioBuffer
+        }
+
+        isAudioInitialized() {
+            return this.audioInitialized
         }
     }
 

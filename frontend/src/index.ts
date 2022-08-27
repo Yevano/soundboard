@@ -396,19 +396,18 @@ async function updateReverb(drySlider: Slider, wetSlider: Slider, delaySlider: S
     audioEffects.setReverb(dry, wet, delay)
 }
 
-const emptyBuffer = globalAudioContext.createBuffer(2, 1, 44100)
-
 async function createAudioButton(name: string, category: string, index: number) {
     const buttonElement = document.createElement('button')
     buttonElement.className = 'audio-button'
     buttonElement.setAttribute('pressed', '')
     buttonElement.style.order = index.toString()
+    buttonElement.style.opacity = '0.5'
     const buttonTitleElement = document.createElement('p')
     buttonTitleElement.textContent = name
     buttonElement.appendChild(buttonTitleElement)
 
     const audioControl = new audio.AudioControl(
-        buttonElement, globalAudioContext, emptyBuffer, audioEffects.inputNode, category, name
+        buttonElement, globalAudioContext, audioEffects.inputNode, category, name
     )
 
     doAsync(async () => {
@@ -422,6 +421,7 @@ async function createAudioButton(name: string, category: string, index: number) 
         }
 
         audioControl.setAudioBuffer(audioBuffer)
+        buttonElement.style.opacity = '1'
     })
 
     buttonElement.onclick = async event => {
