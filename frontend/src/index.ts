@@ -712,8 +712,10 @@ async function start() {
 
         'Minus': _ => { sliders.volumeSlider.value -= 0.1 },
         'Equal': _ => { sliders.volumeSlider.value += 0.1 },
-        'Comma': _ => { sliders.pitchSlider.value -= 0.1 },
-        'Period': _ => { sliders.pitchSlider.value += 0.1 },
+        'NumpadDecimal': _ => { sliders.volumeSlider.reset() },
+        'ArrowLeft': _ => { sliders.pitchSlider.value -= 0.1 },
+        'ArrowRight': _ => { sliders.pitchSlider.value += 0.1 },
+        'Numpad0': _ => { sliders.pitchSlider.reset() },
 
         'Numpad7': _ => { sliders.drySlider.value -= 0.1 },
         'Numpad8': _ => { sliders.drySlider.value += 0.1 },
@@ -724,12 +726,8 @@ async function start() {
         'Numpad1': _ => { sliders.dankSlider.value -= 0.1 },
         'Numpad2': _ => { sliders.dankSlider.value += 0.1 },
         'Numpad3': _ => { sliders.dankSlider.reset() },
-
-        'ArrowLeft':  _ => { sliders.dankSlider.value -= 0.1 },
-        'ArrowRight': _ => { sliders.dankSlider.value += 0.1 },
         
-        'End': _ => stopAll()
-
+        'End': _ => stopAll(),
     }
 
     const dropzone = document.getElementById('dropzone')!
