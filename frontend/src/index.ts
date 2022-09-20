@@ -2,7 +2,7 @@ import { audio } from "./audio"
 import { create, ref, showTooltip, text, Tooltip } from "./dom"
 import { isKeyDown } from "./keyboard"
 import { Recorder } from "./recording-bank"
-import { clamp, Color, colorFromAngle, Dictionary, doAsync, filter, flatten, max, next, sleep } from "./util"
+import { clamp, Color, colorFromAngle, Dictionary, doAsync, filter, flatten, max, next, relerp, sleep } from "./util"
 import { getAudioBuffer, getAudioList, putAudioFile } from "./webapi"
 import { CustomWindow, globalThis } from './global'
 import { Modal } from "./modal"
@@ -145,6 +145,7 @@ const audioFiles: Dictionary<string[]> = {
         'Stop it get some help',
         'STOP THE HAMMERING',
         'You have been stopped',
+        'You aint black',
     ],
     
     'Clips': [
@@ -190,6 +191,10 @@ const audioFiles: Dictionary<string[]> = {
         'You are matched',
         'Crap',
         'transgender',
+        'It all came so hard and so fast',
+        'Stop farming',
+        'Its time to duel',
+        'That is one big pile of shit',
     ],
 
     'Friends': [
@@ -232,7 +237,8 @@ const audioFiles: Dictionary<string[]> = {
         'Ill be here all week',
         'Who do you think me for',
         'Yes',
-        'Im calling the cop'
+        'Im calling the cop',
+        'Spit in my transgender ass',
     ]
 }
 
@@ -241,7 +247,7 @@ const volumeSliderRef = ref<HTMLInputElement>('volume-slider')
 const pitchSliderRef = ref<HTMLInputElement>('pitch-slider')
 const drySliderRef = ref<HTMLInputElement>('reverb-dry-slider')
 const wetSliderRef = ref<HTMLInputElement>('reverb-wet-slider')
-const delaySliderRef = ref<HTMLInputElement>('reverb-delay-slider')
+const dankSliderRef = ref<HTMLInputElement>('dank-slider')
 const playAllRef = ref<HTMLButtonElement>('play-button')
 const stopAllRef = ref<HTMLButtonElement>('stop-button')
 const playFriendsRef = ref<HTMLButtonElement>('friends-button')
@@ -260,7 +266,7 @@ class Slider {
     inputValue = 0
     inputHandler: (value: number) => void = (_: number) => { }
 
-    constructor(inputElement: HTMLInputElement, defaultValue: number) {
+    constructor(inputElement: HTMLInputElement, readonly defaultValue: number) {
         this.inputElement = inputElement
         this.value = defaultValue
 
@@ -288,6 +294,10 @@ class Slider {
         this.inputHandler(this.inputValue)
     }
 
+    reset() {
+        this.value = this.defaultValue
+    }
+
     private getElementValue() {
         const minValue = Number.parseInt(this.inputElement.min)
         const maxValue = Number.parseInt(this.inputElement.max)
@@ -301,7 +311,7 @@ interface ModifierSliders {
     pitchSlider: Slider,
     drySlider: Slider,
     wetSlider: Slider,
-    delaySlider: Slider,
+    dankSlider: Slider,
 }
 
 const sliderPromise: Promise<ModifierSliders> = (async () => {
@@ -310,13 +320,13 @@ const sliderPromise: Promise<ModifierSliders> = (async () => {
         pitchSliderElement,
         drySliderElement,
         wetSliderElement,
-        delaySliderElement,
+        dankSliderElement,
     ] = await Promise.all([
         volumeSliderRef.get(),
         pitchSliderRef.get(),
         drySliderRef.get(),
         wetSliderRef.get(),
-        delaySliderRef.get(),
+        dankSliderRef.get(),
     ])
 
     return {
@@ -324,7 +334,7 @@ const sliderPromise: Promise<ModifierSliders> = (async () => {
         pitchSlider: new Slider(pitchSliderElement, 0.5),
         drySlider: new Slider(drySliderElement, 1),
         wetSlider: new Slider(wetSliderElement, 0),
-        delaySlider: new Slider(delaySliderElement, 0.25),
+        dankSlider: new Slider(dankSliderElement, 0),
     }
 })()
 
@@ -388,12 +398,15 @@ async function updatePitch(pitchSlider: Slider) {
     }
 }
 
-async function updateReverb(drySlider: Slider, wetSlider: Slider, delaySlider: Slider) {
+async function updateReverb(drySlider: Slider, wetSlider: Slider) {
     const dry = drySlider.value
     const wet = wetSlider.value
-    const delay = delaySlider.value
 
-    audioEffects.setReverb(dry, wet, delay)
+    audioEffects.setReverb(dry, wet)
+}
+
+async function updateDankness(dankSlider: Slider) {
+    audioEffects.setDankness(dankSlider.value)
 }
 
 async function createAudioButton(name: string, category: string, index: number) {
@@ -504,11 +517,7 @@ async function start() {
         event.preventDefault()
     }
 
-    const signalMultiplierWorkletURL = new WorkerUrl(
-        new URL('./audio-worklets/signal-multiplier-processor.ts', import.meta.url), {
-            name: 'signal-multiplier-processor'
-        }
-    )
+    
 
     const biasWorkletURL = new WorkerUrl(
         new URL('./audio-worklets/multiply-processor.ts', import.meta.url), {
@@ -516,8 +525,16 @@ async function start() {
         }
     )
 
-    await globalAudioContext.audioWorklet.addModule(signalMultiplierWorkletURL)
+    const distortionWorkletURL = new WorkerUrl(
+        new URL('./audio-worklets/distortion-processor.ts', import.meta.url), {
+            name: 'distortion-processor'
+        }
+    )
+
+    
+
     await globalAudioContext.audioWorklet.addModule(biasWorkletURL)
+    await globalAudioContext.audioWorklet.addModule(distortionWorkletURL)
 
     audioEffects = new audio.AudioEffects(globalAudioContext)
     audioEffects.postGainNode.connect(globalAudioContext.destination)
@@ -631,22 +648,22 @@ async function start() {
     }
 
     sliders.drySlider.inputHandler = value => {
-        updateReverb(sliders.drySlider, sliders.wetSlider, sliders.delaySlider)
+        updateReverb(sliders.drySlider, sliders.wetSlider)
     }
 
     sliders.wetSlider.inputHandler = value => {
-        updateReverb(sliders.drySlider, sliders.wetSlider, sliders.delaySlider)
+        updateReverb(sliders.drySlider, sliders.wetSlider)
     }
 
-    sliders.delaySlider.inputHandler = value => {
-        updateReverb(sliders.drySlider, sliders.wetSlider, sliders.delaySlider)
+    sliders.dankSlider.inputHandler = value => {
+        updateDankness(sliders.dankSlider)
     }
 
-    sliders.volumeSlider.value = 0.05
-    sliders.pitchSlider.value = 0.5
-    sliders.drySlider.value = 1
-    sliders.wetSlider.value = 0
-    sliders.delaySlider.value = 0.25
+    sliders.volumeSlider.reset()
+    sliders.pitchSlider.reset()
+    sliders.drySlider.reset()
+    sliders.wetSlider.reset()
+    sliders.dankSlider.reset()
 
     let overrideKeyBinds = false
 
@@ -700,10 +717,16 @@ async function start() {
 
         'Numpad7': _ => { sliders.drySlider.value -= 0.1 },
         'Numpad8': _ => { sliders.drySlider.value += 0.1 },
+        'Numpad9': _ => { sliders.drySlider.reset()},
         'Numpad4': _ => { sliders.wetSlider.value -= 0.1 },
         'Numpad5': _ => { sliders.wetSlider.value += 0.1 },
-        'Numpad1': _ => { sliders.delaySlider.value -= 0.1 },
-        'Numpad2': _ => { sliders.delaySlider.value += 0.1 },
+        'Numpad6': _ => { sliders.wetSlider.reset() },
+        'Numpad1': _ => { sliders.dankSlider.value -= 0.1 },
+        'Numpad2': _ => { sliders.dankSlider.value += 0.1 },
+        'Numpad3': _ => { sliders.dankSlider.reset() },
+
+        'ArrowLeft':  _ => { sliders.dankSlider.value -= 0.1 },
+        'ArrowRight': _ => { sliders.dankSlider.value += 0.1 },
         
         'End': _ => stopAll()
 
@@ -785,8 +808,6 @@ async function start() {
         }
     })
 
-    console.log(document.body)
-  
     let fileDraggedOver = false
 
     const modal = new Modal<string>(dropzone)
