@@ -1,10 +1,17 @@
-export class MultiplyProcessor extends AudioWorkletProcessor {
+export class ClipProcessor extends AudioWorkletProcessor {
     process(
         inputs: Float32Array[][],
         outputs: Float32Array[][],
-        parameters: { coefficient: Float32Array }
+        parameters: { cutoff: Float32Array }
     ): boolean {
-        if (inputs.length === 0 || outputs.length === 0) {
+        if (outputs.length === 0) {
+            return false
+        }
+
+        if (inputs.length === 0) {
+            for (const c of outputs[0]) {
+                c.fill(0)
+            }
             return false
         }
 
@@ -16,7 +23,9 @@ export class MultiplyProcessor extends AudioWorkletProcessor {
             const outputChannel = output[channelIndex]
 
             for (let i = 0; i < inputChannel.length; i++) {
-                outputChannel[i] = inputChannel[i] * parameters.coefficient[i]
+                var di = inputChannel[i]
+                var ci = parameters.cutoff[i]
+                outputChannel[i] = di > ci ? ci : di < -ci ? ci : di
             }
         }
 
@@ -25,9 +34,9 @@ export class MultiplyProcessor extends AudioWorkletProcessor {
 
     static parameterDescriptors = [
         {
-            name: 'coefficient'
-        },
+            name: 'cutoff'
+        }
     ]
 }
 
-registerProcessor('multiply-processor', MultiplyProcessor)
+registerProcessor('clip-processor', ClipProcessor)
