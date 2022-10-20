@@ -97,6 +97,7 @@ export class Tooltip {
 
         this.element = create('div', { }, e => {
             e.style.position = 'absolute'
+            e.style.zIndex = '10'
             e.style.bottom = '4em'
             e.style.backgroundColor = 'rgba(255, 255, 255, 0.75)'
             e.style.borderRadius = '0.5em'
@@ -119,7 +120,7 @@ export class Tooltip {
 }
 
 // TODO: This is really wrong but it works right now.
-export function moveRelativeInsideViewport(element: HTMLElement, viewport = window.visualViewport) {
+export function moveRelativeInsideViewport(element: HTMLElement, viewport = window.visualViewport!) {
     let rect = element.getBoundingClientRect()
     let parentRect = (element.parentElement || document.body).getBoundingClientRect()
     if (rect.left < viewport.pageLeft) {
@@ -166,3 +167,5 @@ export function showTooltip(message: string, element: HTMLElement) {
 
     return tooltipDiv
 }
+
+// export function get

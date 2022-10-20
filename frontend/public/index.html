@@ -38,13 +38,18 @@
                 <button class="audio-button" id="play-button">Play all</button>
                 <button class="audio-button" id="stop-button">Stop all</button>
                 <button class="audio-button" id="friends-button">Play friends</button>
-                <button class="audio-button loop-mode" id="loop-button">Loop Mode</button>
+                <button class="audio-button toggle" id="loop-button">Loop</button>
+                <button class="audio-button toggle" id="sustain-button">Sustain</button>
             </div>
         </div>
         <div class="recording-bank" id="recording-bank">
 
         </div>
     </div>
-    <div id="control-container"  />
+    <div id="control-container"></div>
+    <div class="node-gui">
+        <div class="node-selector" id="node-selector"></div>
+        <canvas id="gui-canvas"></canvas>
+    </div>
 </body>
 </html>

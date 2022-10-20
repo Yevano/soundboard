@@ -1,12 +1,15 @@
 import { audio } from "./audio"
-import { count, map } from "./util"
-import { putAudio, putEncodedAudio } from "./webapi"
+import { drawWaveform } from "./canvas"
+import { getRecordingEntries, setRecordingEntries } from "./store"
+import { count, doAsync, map } from "./util"
+import { getAudioBuffer, putAudio, putEncodedAudio } from "./webapi"
 
 export class Recorder extends audio.AudioBufferSourcePlayer {
     readonly mediaStreamDestination: MediaStreamAudioDestinationNode
     private mediaRecorder: MediaRecorder | undefined
     private audioBuffer: AudioBuffer
     currentlyRecording: boolean = false
+    private waveformImage: HTMLImageElement | undefined
 
     constructor(
         readonly buttonElement: HTMLButtonElement,
@@ -33,19 +36,35 @@ export class Recorder extends audio.AudioBufferSourcePlayer {
         return this.audioBuffer
     }
 
-    record() {
+    private updateAudioBuffer(audioBuffer: AudioBuffer) {
+        this.audioBuffer = audioBuffer
+        this.trimStart()
+        this.setWaveformImage()
+    }
+
+    recordStream(mediaStream: MediaStream) {
         this.currentlyRecording = true
-        this.mediaRecorder = new MediaRecorder(this.mediaStreamDestination.stream)
+        this.mediaRecorder = new MediaRecorder(mediaStream)
         this.mediaRecorder.start()
 
         this.mediaRecorder.ondataavailable = async (event) => {
             console.log('Got data from recorder')
             const buffer = await event.data.arrayBuffer()
             const response = await putEncodedAudio(`recording-${this.index}`, buffer)
-            this.audioBuffer = await this.audioContext.decodeAudioData(buffer)
-            console.log(response)
-            this.trimStart()
+            this.updateAudioBuffer(await this.audioContext.decodeAudioData(buffer))
+
+            const entries = getRecordingEntries()
+            const { fileName } = response
+            entries[this.index] = {
+                displayName: '',
+                fileName: fileName!,
+            }
+            setRecordingEntries(entries)
         }
+    }
+
+    record() {
+        this.recordStream(this.mediaStreamDestination.stream)
     }
 
     stopRecording() {
@@ -55,6 +74,37 @@ export class Recorder extends audio.AudioBufferSourcePlayer {
 
         this.mediaRecorder.stop()
         this.currentlyRecording = false
+    }
+
+    loadFile(fileName: string) {
+        doAsync(async () => {
+            this.updateAudioBuffer(await getAudioBuffer(fileName, this.audioContext))
+        })
+    }
+
+    setWaveformImage() {
+        doAsync(async () => {
+            const waveform = this.audioBuffer.getChannelData(0)
+            const imageBlob = await drawWaveform(waveform)
+
+            const url = URL.createObjectURL(imageBlob)
+            const imageElement = new Image()
+            imageElement.style.position = 'absolute'
+            imageElement.style.left = '0'
+            imageElement.style.top = '0'
+            imageElement.style.width = '100%'
+            imageElement.style.height = '100%'
+            imageElement.style.order = '0'
+
+            imageElement.src = url
+
+            if (this.waveformImage) {
+                this.waveformImage.remove()
+            }
+
+            this.waveformImage = imageElement
+            this.buttonElement.insertBefore(imageElement, this.buttonElement.firstChild)
+        })
     }
 
     private trimStart() {

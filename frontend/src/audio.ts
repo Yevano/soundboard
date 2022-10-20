@@ -447,7 +447,7 @@ export namespace audio {
         startTime: number = 0
         private requestPlayAfterStop: boolean = false
         private audioSource: AudioBufferSourceNode | undefined
-        private pitchMultiplier: number = 1
+        private detuneValue: number = 1
         protected readonly output: AudioNode
         private loopModeProp = false
 
@@ -481,7 +481,7 @@ export namespace audio {
             const newAudioSource = this.getAudioContext().createBufferSource()
             this.audioSource = newAudioSource
             this.audioSource.loop = this.loopMode
-            this.detune(this.pitchMultiplier)
+            this.detune(this.detuneValue)
             this.audioSource.buffer = this.getAudioBuffer()
             this.audioSource.connect(this.output)
             this.audioSource.start(0)
@@ -503,14 +503,27 @@ export namespace audio {
         }
 
         detune(pitchMultiplier: number) {
-            this.pitchMultiplier = pitchMultiplier
+            this.detuneValue = pitchMultiplier
             if(this.audioSource !== undefined) {
-                this.audioSource.detune.value = Math.log2(this.pitchMultiplier) * 1200
+                this.audioSource.detune.value = this.detuneValue * 100
             }
         }
-    
+
         getDuration() {
-            return this.getAudioBuffer().duration * this.pitchMultiplier
+            // N: note offset
+            // F0: base frequency
+            // F1: new frequency
+            // F1 = F0 * 2 ** (N / 12)
+            
+            // detuneValue represents note offset (in semitones)
+            // If we have N = 12k, then new duration = 2 times k * the old duration
+
+            // F1 / F0 = 2 ** (N / 12)
+
+            const n = this.detuneValue
+            const f0Overf1 = 1 / (2 ** (n / 12))
+
+            return this.getAudioBuffer().duration * f0Overf1
         }
     
         getElapsedTime() {
@@ -704,5 +717,22 @@ export namespace audio {
             sum += buffer[i] ** 2
         }
         return sum
+    }
+
+    export class AudioDevices {
+        private mediaStream: MediaStream | undefined
+        private mediaStreamPromise: Promise<MediaStream>
+
+        constructor() {
+            this.mediaStreamPromise = navigator.mediaDevices.getUserMedia({ audio: true })
+        }
+
+        async getStream() {
+            if (!this.mediaStream) {
+                this.mediaStream = await this.mediaStreamPromise
+            }
+
+            return this.mediaStream
+        }
     }
 }

@@ -5,7 +5,14 @@ export function getRecordingEntries(): RecordingEntry[] {
     if (item !== null) {
         return JSON.parse(item)
     } else {
-        return []
+        const entries: RecordingEntry[] = new Array(10)
+        for (let i = 0; i < entries.length; i++) {
+            entries[i] = {
+                displayName: '',
+                fileName: null,
+            }
+        }
+        return entries
     }
 }
 

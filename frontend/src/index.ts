@@ -1,13 +1,15 @@
 import { audio } from "./audio"
-import { create, ref, showTooltip, text, Tooltip } from "./dom"
+import { create, ref, text, Tooltip } from "./dom"
 import { isKeyDown } from "./keyboard"
-import { Recorder } from "./recording-bank"
-import { clamp, Color, colorFromAngle, Dictionary, doAsync, filter, flatten, max, next, relerp, sleep } from "./util"
-import { getAudioBuffer, getAudioList, putAudioFile } from "./webapi"
-import { CustomWindow, globalThis } from './global'
 import { Modal } from "./modal"
+import { Recorder } from "./recording-bank"
+import { clamp, Color, colorFromAngle, Dictionary, doAsync, filter, flatMap, flatten, iterableOf, kvs, map, next, relerp } from "./util"
+import { getAudioBuffer, putAudioFile } from "./webapi"
 // import signalMultiplierWorkletURL from 'worklet-loader!./audio-worklets/signal-multiplier-processor.worklet.ts'
 import { WorkerUrl } from 'worker-url'
+import { drawWaveform } from "./canvas"
+import { NodeControls, NodeTypeSelector } from "./node-controls"
+import { getRecordingEntries } from "./store"
 
 const audioFiles: Dictionary<string[]> = {
     'SFX': [
@@ -63,6 +65,7 @@ const audioFiles: Dictionary<string[]> = {
         'TS You were kicked from the server',
         'TS You were moved',
         'TS You were banned',
+        'Airhorn',
     ],
 
     'Music': [
@@ -105,6 +108,8 @@ const audioFiles: Dictionary<string[]> = {
         'JPEG',
         'Bwah',
         'Im gay',
+        'Hello there',
+        'Another happy landing',
     ],
 
     'Quotes': [
@@ -146,6 +151,11 @@ const audioFiles: Dictionary<string[]> = {
         'STOP THE HAMMERING',
         'You have been stopped',
         'You aint black',
+        'Exploding Milk Porn',
+        'Radical left stupid person',
+        'Aint but two genders',
+        'That must be super fucking hard for you',
+        'I invented cancer',
     ],
     
     'Clips': [
@@ -195,6 +205,17 @@ const audioFiles: Dictionary<string[]> = {
         'Stop farming',
         'Its time to duel',
         'That is one big pile of shit',
+        'Get your hand off my penis',
+        'This is democracy manifest',
+        'What is the charge',
+        'Ah yes I see that you know your Judo well',
+        'And you sir Are you waiting to receive my limp penis',
+        'Oh no Sam Seder',
+        'Thats bad',
+        'Biologically I have shifted',
+        'I had five colonoscopies last week',
+        'Call a crackhead',
+        'What do you mean by happen',
     ],
 
     'Friends': [
@@ -239,6 +260,10 @@ const audioFiles: Dictionary<string[]> = {
         'Yes',
         'Im calling the cop',
         'Spit in my transgender ass',
+        'Thats an RPG you fuckwit',
+        'Rocket propelled grenade',
+        'Know your tools of warfare',
+        'You can bitch at me every day',
     ]
 }
 
@@ -252,14 +277,20 @@ const playAllRef = ref<HTMLButtonElement>('play-button')
 const stopAllRef = ref<HTMLButtonElement>('stop-button')
 const playFriendsRef = ref<HTMLButtonElement>('friends-button')
 const loopModeRef = ref<HTMLButtonElement>('loop-button')
+const sustainModeRef = ref<HTMLButtonElement>('sustain-button')
 const recordingBankContainerRef = ref<HTMLDivElement>('recording-bank')
+const guiCanvasRef = ref<HTMLCanvasElement>('gui-canvas')
+const nodeTypeSelectorRef = ref<HTMLDivElement>('node-selector')
 
 const globalAudioContext = new AudioContext()
 
 let audioEffects!: audio.AudioEffects
+const audioDevices = new audio.AudioDevices()
 
 const recorders: Recorder[] = []
 const audioControls: audio.AudioControl[] = []
+
+let keyBinds: Dictionary<BindValue>
 
 class Slider {
     readonly inputElement: HTMLInputElement
@@ -343,6 +374,7 @@ function getAudioPlayers() {
 }
 
 let loopMode = false
+let sustainMode = true
 
 function getButtonPlayTimeBackground(playTimeAmount: number) {
     return `linear-gradient(to right, #8c7099aa ${playTimeAmount * 100}%, #8c709945 ${playTimeAmount * 100}%)`
@@ -387,14 +419,9 @@ function updateVolume(volumeSlider: Slider) {
 }
 
 async function updatePitch(pitchSlider: Slider) {
-    let value = pitchSlider.value
-    if (value < 0.5) {
-        value += 0.5
-    } else {
-        value = (value - 0.5) / 1.5 + 1
-    }
+    const detuneValude = relerp(0, 1, -6, 6, pitchSlider.value)
     for (const player of getAudioPlayers()) {
-        player.detune(value)
+        player.detune(detuneValude)
     }
 }
 
@@ -415,7 +442,12 @@ async function createAudioButton(name: string, category: string, index: number) 
     buttonElement.setAttribute('pressed', '')
     buttonElement.style.order = index.toString()
     buttonElement.style.opacity = '0.5'
+    buttonElement.style.position = 'relative'
+    buttonElement.style.height = '1em'
     const buttonTitleElement = document.createElement('p')
+    buttonTitleElement.style.position = 'absolute'
+    buttonTitleElement.style.top = '0'
+    buttonTitleElement.style.width = '75%'
     buttonTitleElement.textContent = name
     buttonElement.appendChild(buttonTitleElement)
 
@@ -435,6 +467,22 @@ async function createAudioButton(name: string, category: string, index: number) 
 
         audioControl.setAudioBuffer(audioBuffer)
         buttonElement.style.opacity = '1'
+
+        const waveform = audioBuffer.getChannelData(0)
+        const imageBlob = await drawWaveform(waveform)
+
+        const url = URL.createObjectURL(imageBlob)
+        const imageElement = new Image()
+        imageElement.style.position = 'absolute'
+        imageElement.style.left = '0'
+        imageElement.style.top = '0'
+        imageElement.style.width = '100%'
+        imageElement.style.height = '100%'
+        imageElement.style.order = '0'
+
+        imageElement.src = url
+
+        buttonElement.insertBefore(imageElement, buttonTitleElement)
     })
 
     buttonElement.onclick = async event => {
@@ -449,8 +497,13 @@ async function createAudioButton(name: string, category: string, index: number) 
     tooltip.messageElement.style.fontSize = '2em'
     tooltip.messageElement.style.userSelect = 'none'
 
+    let tooltipString: string
+
     buttonElement.onmouseenter = event => {
-        tooltip.show(name)
+        if (tooltipString === undefined) {
+            tooltipString = `${getKeyBind(name) || ''} ${name}`
+        }
+        tooltip.show(tooltipString)
         // buttonTitleElement.style.overflow = 'visible'
     }
 
@@ -460,6 +513,30 @@ async function createAudioButton(name: string, category: string, index: number) 
     }
 
     return audioControl
+}
+
+function keyboardNamePretty(key: string) {
+    if (key.startsWith('Key')) {
+        return key.substring(3)
+    } else {
+        return key
+    }
+}
+
+function getKeyBind(name: string): string | undefined {
+    const keysToNames = flatMap(kvs(keyBinds), ([key, control]): [string, string][] => {
+        if (control instanceof Array) {
+            return [[key, control[0]], [`${key} + SPACE`, control[1]]]
+        } else if (typeof(control) === 'string') {
+            return [[key, control]]
+        } else {
+            return []
+        }
+    })
+
+    const matching = filter(keysToNames, ([_, otherName]) => otherName === name)
+    const keyName = next(map(matching, x => keyboardNamePretty(x[0])))
+    return keyName
 }
 
 async function addSound(controlContainer: HTMLElement, name: string, category: string, index: number, color: Color) {
@@ -507,17 +584,44 @@ function* categoriesIter() {
     }
 }
 
+function toggleLoopMode() {
+    doAsync(async () => {
+        const button = await loopModeRef.get()
+        loopMode = !loopMode
+        if (loopMode) {
+            button.setAttribute('active', 'active')
+        } else {
+            button.removeAttribute('active')
+        }
+
+        for (const player of getAudioPlayers()) {
+            player.loopMode = loopMode
+        }
+    })
+}
+
+function toggleSustainMode() {
+    doAsync(async () => {
+        const button = await sustainModeRef.get()
+        sustainMode = !sustainMode
+        if (sustainMode) {
+            button.setAttribute('active', 'active')
+        } else {
+            button.removeAttribute('active')
+        }
+    })
+}
+
 type BindValue
-= audio.AudioPlayer
+= string
 | ((e: KeyboardEvent) => void)
-| audio.AudioPlayer[]
+| [string, string]
+| audio.AudioPlayer
 
 async function start() {
     document.oncontextmenu = event => {
         event.preventDefault()
     }
-
-    
 
     const biasWorkletURL = new WorkerUrl(
         new URL('./audio-worklets/multiply-processor.ts', import.meta.url), {
@@ -530,8 +634,6 @@ async function start() {
             name: 'distortion-processor'
         }
     )
-
-    
 
     await globalAudioContext.audioWorklet.addModule(biasWorkletURL)
     await globalAudioContext.audioWorklet.addModule(distortionWorkletURL)
@@ -597,25 +699,36 @@ async function start() {
 
     const loopModeButton = await loopModeRef.get()
     loopModeButton.onclick = () => {
-        loopMode = !loopMode
-        if (loopMode) {
-            loopModeButton.setAttribute('active', 'active')
-        } else {
-            loopModeButton.removeAttribute('active')
-        }
+        toggleLoopMode()
+    }
 
-        for (const player of getAudioPlayers()) {
-            player.loopMode = loopMode
-        }
+    const sustainModeButton = await sustainModeRef.get()
+    sustainModeButton.setAttribute('active', 'active')
+    sustainModeButton.onclick = () => {
+        toggleSustainMode()
     }
 
     const recordingBankContainer = await recordingBankContainerRef.get()
+
+    const recordingEntries = getRecordingEntries()
     
     for (let i = 0; i < 10; i++) {
         const buttonElement = document.createElement('button')
+        buttonElement.style.position = 'relative'
+        buttonElement.style.width = '10em';
         const recorder = new Recorder(buttonElement, i, globalAudioContext, audioEffects.preGainNode, audioEffects.inputNode)
+
+        const entry = recordingEntries[i]
+        if (entry.fileName !== null) {
+            recorder.loadFile(entry.fileName)
+        }
+
         recorders.push(recorder)
-        buttonElement.appendChild(text('p', `Recording #${i + 1}`))
+        const buttonTitleElement = text('p', `Recording #${i + 1}`)
+        buttonTitleElement.style.position = 'absolute'
+        buttonTitleElement.style.top = '0'
+        buttonTitleElement.style.width = '75%'
+        buttonElement.appendChild(buttonTitleElement)
         buttonElement.onclick = event => {
             if (recorder.currentlyRecording) {
                 buttonElement.removeAttribute('recording')
@@ -623,9 +736,17 @@ async function start() {
                 return
             }
 
-            if (event.shiftKey) {
+            const shouldSustain = sustainMode !== event.shiftKey
+
+            if (shouldSustain) {
                 buttonElement.setAttribute('recording', 'recording')
                 recorder.record()
+            } else if (event.ctrlKey) {
+                buttonElement.setAttribute('recording', 'recording')
+                doAsync(async () => {
+                    const stream = await audioDevices.getStream()
+                    recorder.recordStream(stream)
+                })
             } else {
                 recorder.play()
             }
@@ -636,7 +757,6 @@ async function start() {
         }
 
         recordingBankContainer.appendChild(buttonElement)
-
     }
 
     sliders.volumeSlider.inputHandler = value => {
@@ -667,37 +787,37 @@ async function start() {
 
     let overrideKeyBinds = false
 
-    const keyBinds: Dictionary<BindValue> = {
-        'KeyQ': [controlFromName('Laugh Track')!, controlFromName('Windows 95 Error')!],
-        'KeyP': controlFromName('Police Siren 1')!,
-        'BracketLeft': controlFromName('Police Siren 2')!,
-        'BracketRight': controlFromName('Im calling the cop')!,
-        'KeyA': controlFromName('Gun shot 1')!,
-        'KeyL': controlFromName('Quack')!,
-        'KeyH': controlFromName('Headshot')!,
-        'KeyN': [controlFromName('Nononononono')!, controlFromName('Not alright')!],
-        'KeyT': [controlFromName('bark4me')!, controlFromName('Bitches')!],
-        'Semicolon': controlFromName('Hawnk')!,
-        'KeyM': [controlFromName('Stop it get some help')!, controlFromName('Murder is legal')!],
-        'KeyX': [controlFromName('STOP')!, controlFromName('STOP THE HAMMERING')!],
-        'KeyO': controlFromName('OBAMNA')!,
-        'KeyB': [controlFromName('Bwah')!, controlFromName('Breasts')!],
-        'KeyD': controlFromName('Bye bye')!,
-        'KeyU': controlFromName('Im gay')!,
-        'KeyV': controlFromName('Its very sad')!,
-        'KeyZ': controlFromName('We Love You')!,
-        'KeyJ': controlFromName('What rules')!,
-        'KeyC': [controlFromName('jermaThing')!, controlFromName('Wet ass p word')!],
-        'KeyS': controlFromName('Oof')!,
-        'KeyR': [controlFromName('Thats how it flows')!, controlFromName('Ring ring the schoolbell')!],
-        'KeyF': controlFromName('Dinosaurs are ours')!,
-        'KeyK': controlFromName('My favorite big booty Latina')!,
-        'KeyG': controlFromName('GAS')!,
-        'KeyW': [controlFromName('Youre dead')!, controlFromName('What an idiot')!],
-        'KeyE': controlFromName('Eww')!,
-        'KeyI': controlFromName('Yes')!,
-        'KeyY': controlFromName('Not alright')!,
-        'Insert': controlFromName('Crap')!,
+    keyBinds = {
+        'KeyQ': ['Laugh Track', 'Windows 95 Error'],
+        'KeyP': ['Police Siren 1', 'Call a crackhead'],
+        'BracketLeft': 'Police Siren 2',
+        'BracketRight': ['Im calling the cop', 'What is the charge'],
+        'KeyA': 'Gun shot 1',
+        'KeyL': 'Quack',
+        'KeyH': ['Headshot', 'Hello there'],
+        'KeyN': ['Nononononono', 'No'],
+        'KeyT': ['bark4me', 'Bitches'],
+        'Semicolon': ['Hawnk', 'Airhorn',],
+        'KeyM': ['Stop it get some help', 'Murder is legal'],
+        'KeyX': ['STOP', 'STOP THE HAMMERING'],
+        'KeyO': 'OBAMNA',
+        'KeyB': ['Bwah', 'Breasts'],
+        'KeyD': 'Bye bye',
+        'KeyU': 'Im gay',
+        'KeyV': 'Its very sad',
+        'KeyZ': 'We Love You',
+        'KeyJ': 'What rules',
+        'KeyC': ['jermaThing', 'Crap'],
+        'KeyS': ['Oof', 'Get your hand off my penis'],
+        'KeyR': ['Thats how it flows', 'Ring ring the schoolbell'],
+        'KeyF': 'Dinosaurs are ours',
+        'KeyK': 'My favorite big booty Latina',
+        'KeyG': ['GAS', 'Thats when I pull out my gun'],
+        'KeyW': ['Youre dead', 'What an idiot'],
+        'KeyE': 'Eww',
+        'KeyI': 'Yes',
+        'KeyY': ['Not alright', 'This is democracy manifest'],
+        'Comma': 'Exploding Milk Porn',
 
         'Digit1': recorders[0],
         'Digit2': recorders[1],
@@ -710,11 +830,14 @@ async function start() {
         'Digit9': recorders[8],
         'Digit0': recorders[9],
 
+        'PageUp': _ => { toggleLoopMode() },
+        'PageDown': _ => { toggleSustainMode() },
+
         'Minus': _ => { sliders.volumeSlider.value -= 0.1 },
         'Equal': _ => { sliders.volumeSlider.value += 0.1 },
         'NumpadDecimal': _ => { sliders.volumeSlider.reset() },
-        'ArrowLeft': _ => { sliders.pitchSlider.value -= 0.1 },
-        'ArrowRight': _ => { sliders.pitchSlider.value += 0.1 },
+        'ArrowLeft': _ => { sliders.pitchSlider.value -= 1 / 12 },
+        'ArrowRight': _ => { sliders.pitchSlider.value += 1 / 12 },
         'Numpad0': _ => { sliders.pitchSlider.reset() },
 
         'Numpad7': _ => { sliders.drySlider.value -= 0.1 },
@@ -772,12 +895,16 @@ async function start() {
                 let selectedControl: audio.AudioPlayer
                 if (control instanceof Array) {
                     const i = isKeyDown('Space') ? 1 : 0
-                    selectedControl = control[i]
+                    selectedControl = controlFromName(control[i])!
+                } else if (typeof(control) === "string") {
+                    selectedControl = controlFromName(control)!
                 } else {
                     selectedControl = control
                 }
 
-                if (event.shiftKey && selectedControl.currentlyPlaying) {
+                const shouldSustain = sustainMode !== event.shiftKey
+
+                if (!shouldSustain && selectedControl.currentlyPlaying) {
                     selectedControl.stop()
                 } else {
                     selectedControl.play()
@@ -796,9 +923,12 @@ async function start() {
         }
         if (code in keyBinds) {
             const control = keyBinds[code]
-            if (event.shiftKey && !(control instanceof Function)) {
+            const shouldSustain = sustainMode !== event.shiftKey
+            if (!shouldSustain && !(control instanceof Function)) {
                 if (control instanceof Array) {
-                    control[isKeyDown('Space') ? 1 : 0].stop()
+                    controlFromName(control[isKeyDown('Space') ? 1 : 0])!.stop()
+                } else if (typeof(control) === 'string') {
+                    controlFromName(control)!.stop()
                 } else {
                     control.stop()
                 }
@@ -905,11 +1035,10 @@ async function start() {
         }
     }
 
-    try {
-        const userMedia = await navigator.mediaDevices.getUserMedia({ audio: true })
-    } catch (e) {
-        console.log('error getting user device:', e)
-    }
+    const nodeTypeSelector = new NodeTypeSelector(await nodeTypeSelectorRef.get())
+    const nodeControls = new NodeControls(nodeTypeSelector, globalAudioContext, await guiCanvasRef.get())
+
+    
 
     console.log('awaiting sounds to load')
 

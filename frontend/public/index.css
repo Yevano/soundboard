@@ -151,7 +151,7 @@ body {
     background-color: #8c709945;
 }
 
-.audio-button.loop-mode[active] {
+.audio-button.toggle[active] {
     filter: brightness(150%);
 }
 
@@ -193,4 +193,15 @@ body {
 
 .top-controls {
     background-color: rgb(22, 22, 36);
+}
+
+.node-gui {
+    display: flex;
+    flex-direction: column;
+    margin-top: 0.5em;
+    gap: 0.25em;
+}
+
+.node-selector {
+    height: 4em;
 }

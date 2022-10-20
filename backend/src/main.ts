@@ -6,6 +6,7 @@ import path from 'node:path'
 import multer from 'multer'
 
 import { FileMeta, StoreMeta } from './webapi-types'
+import { DatabaseStore } from './db'
 
 const app = express()
 app.use(cors({
@@ -14,6 +15,8 @@ app.use(cors({
 const audioDirPath = 'store/audio'
 const storage = multer.diskStorage({ destination: audioDirPath })
 const storeAudio = multer({ storage })
+
+const db = new DatabaseStore()
 
 async function getStoreMeta() {
     return JSON.parse((await readFile('store/metadata.json')).toString()) as StoreMeta
