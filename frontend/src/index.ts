@@ -750,15 +750,15 @@ async function start() {
 
             const shouldSustain = sustainMode !== event.shiftKey
 
-            if (shouldSustain) {
-                buttonElement.setAttribute('recording', 'recording')
-                recorder.record()
-            } else if (event.ctrlKey) {
+            if (event.ctrlKey) {
                 buttonElement.setAttribute('recording', 'recording')
                 doAsync(async () => {
                     const stream = await audioDevices.getStream()
                     recorder.recordStream(stream)
                 })
+            } else if (shouldSustain) {
+                buttonElement.setAttribute('recording', 'recording')
+                recorder.record()
             } else {
                 recorder.play()
             }

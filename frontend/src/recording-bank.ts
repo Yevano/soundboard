@@ -39,6 +39,13 @@ export class Recorder extends audio.AudioBufferSourcePlayer {
     private updateAudioBuffer(audioBuffer: AudioBuffer) {
         this.audioBuffer = audioBuffer
         this.trimStart()
+        audioBuffer = this.audioBuffer
+        for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+            const buffer = audioBuffer.getChannelData(i)
+            const sampleDuration = 0.1
+            const targetVolume = 0
+            audio.normalize(buffer, targetVolume, audioBuffer.sampleRate * sampleDuration)
+        }
         this.setWaveformImage()
     }
 
