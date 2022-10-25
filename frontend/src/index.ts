@@ -431,7 +431,7 @@ function updateVolume(volumeSlider: Slider) {
 }
 
 async function updatePitch(pitchSlider: Slider) {
-    const detuneValude = relerp(0, 1, -6, 6, pitchSlider.value)
+    const detuneValude = relerp(0, 1, -12, 12, pitchSlider.value)
     for (const player of getAudioPlayers()) {
         player.detune(detuneValude)
     }
