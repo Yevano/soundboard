@@ -216,6 +216,15 @@ const audioFiles: Dictionary<string[]> = {
         'I had five colonoscopies last week',
         'Call a crackhead',
         'What do you mean by happen',
+        'What do your balls feel like right now',
+        'Youre being a Karen',
+        'The straight white male has the least',
+        'I dont want to be forgiven by jewish people',
+        'Your new idea is stupid',
+        'Sophisticated gun',
+        'Hit very hard',
+        'Very unfair',
+        'Really angry',
     ],
 
     'Friends': [
@@ -264,6 +273,9 @@ const audioFiles: Dictionary<string[]> = {
         'Rocket propelled grenade',
         'Know your tools of warfare',
         'You can bitch at me every day',
+        'What are you trying to get me to say',
+        'Vereeeeeeeno',
+        'Vereena',
     ]
 }
 
