@@ -35,6 +35,9 @@ const config = {
         },
         compress: true,
         port: 8080,
+    },
+    experiments: {
+        asyncWebAssembly: true,
     }
 };
 

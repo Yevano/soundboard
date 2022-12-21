@@ -16,6 +16,9 @@ export class DatabaseStore {
         })
 
         this.connection.execute(this.statements.get('create-users'))
+        
+        // Close the connection
+        this.connection.end()
     }
 }
 

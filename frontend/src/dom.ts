@@ -167,5 +167,3 @@ export function showTooltip(message: string, element: HTMLElement) {
 
     return tooltipDiv
 }
-
-// export function get

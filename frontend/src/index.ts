@@ -3,13 +3,15 @@ import { create, ref, text, Tooltip } from "./dom"
 import { isKeyDown } from "./keyboard"
 import { Modal } from "./modal"
 import { Recorder } from "./recording-bank"
-import { clamp, Color, colorFromAngle, Dictionary, doAsync, filter, flatMap, flatten, iterableOf, kvs, map, next, relerp } from "./util"
+import { AsyncValue, clamp, Color, colorFromAngle, Dictionary, doAsync, filter, flatMap, flatten, iterableOf, kvs, map, next, relerp } from "./util"
 import { getAudioBuffer, putAudioFile } from "./webapi"
-// import signalMultiplierWorkletURL from 'worklet-loader!./audio-worklets/signal-multiplier-processor.worklet.ts'
 import { WorkerUrl } from 'worker-url'
 import { drawWaveform } from "./canvas"
 import { NodeControls, NodeTypeSelector } from "./node-controls"
 import { getRecordingEntries } from "./store"
+
+import { normalize_audio } from "soundboard-wasm"
+import { createPianoControls } from "./piano"
 
 const audioFiles: Dictionary<string[]> = {
     'SFX': [
@@ -86,6 +88,8 @@ const audioFiles: Dictionary<string[]> = {
         'You sit on your ass',
         'Not alright',
         'You blocked me on facebook',
+        'Wake me up',
+        'Here comes the money'
     ],
 
     'Memes': [
@@ -110,6 +114,8 @@ const audioFiles: Dictionary<string[]> = {
         'Im gay',
         'Hello there',
         'Another happy landing',
+        'Wow',
+        'Thats a good thing not a bad thing',
     ],
 
     'Quotes': [
@@ -156,8 +162,30 @@ const audioFiles: Dictionary<string[]> = {
         'Aint but two genders',
         'That must be super fucking hard for you',
         'I invented cancer',
+        'Two year olds',
+        'It was a jewish doctor',
+        'Babes get out of there',
+        'Do not come',
+        'Im gonna come',
+        'Troth sensual',
+        'Omnidirectional sexuality',
+        'Hot damn boy',
+        'Ass cancer',
+        'stfu',
+        'Deranged pervert',
+        'Psychopathic worm',
+        'Bitch tits',
+        'Sexy death porn',
+        'Hitler McFascist Face',
+        'Those guys would look at you and go youre gay',
+        'Ive been coming',
+        'The engagements are negative',
+        'Machines',
+        'wth is a pronoun',
+        'Beat a kid in Walmart',
+        'Bears',
     ],
-    
+
     'Clips': [
         'FBI open up',
         'Witness the power',
@@ -225,6 +253,30 @@ const audioFiles: Dictionary<string[]> = {
         'Hit very hard',
         'Very unfair',
         'Really angry',
+        'B is for bad',
+        'I fought fire with fire',
+        'Hide and seek',
+        'Did he find his nuts',
+        'Uh hello this is somebodys desk',
+        'Im from the IRS',
+        'We were in slavery',
+        'Oh it was paradise',
+        'Larry what are you doing',
+        'FIC',
+        'Im going to call the police',
+        'Im getting impatient',
+        'Girls are so emotional',
+        'He sure is ugly',
+        'Youre a thorn in my side',
+        'Nutcrackers back',
+        'I am your superior',
+        'Radical gender left',
+        'SODA',
+        'Exactly 4 gallons',
+        'Please consider the following',
+        'Wanna play',
+        'Wait',
+        'I hope you die in a fire',
     ],
 
     'Friends': [
@@ -276,6 +328,25 @@ const audioFiles: Dictionary<string[]> = {
         'What are you trying to get me to say',
         'Vereeeeeeeno',
         'Vereena',
+        'Uuuuuhhhnnn',
+        'Twelve inches',
+        'Dick',
+        'Yeah ^_^',
+        'Are you transing my gender',
+        'Mhm yeah',
+        'Head empty no thoughts bark bark',
+        'Vereemna',
+        'OMG Cummies',
+        'Yeah is it gonna work',
+        'tiny',
+        'Nonstop cummies',
+        'Mormons',
+        'Stimulate your senses',
+        'Spit in Vereena',
+        'OMG She got that girldick',
+        'Deranged Vereena',
+        'manergy',
+        'mhm_yeah',
     ]
 }
 
@@ -290,6 +361,7 @@ const stopAllRef = ref<HTMLButtonElement>('stop-button')
 const playFriendsRef = ref<HTMLButtonElement>('friends-button')
 const loopModeRef = ref<HTMLButtonElement>('loop-button')
 const sustainModeRef = ref<HTMLButtonElement>('sustain-button')
+const pianoModeRef = ref<HTMLButtonElement>('piano-button')
 const recordingBankContainerRef = ref<HTMLDivElement>('recording-bank')
 const guiCanvasRef = ref<HTMLCanvasElement>('gui-canvas')
 const nodeTypeSelectorRef = ref<HTMLDivElement>('node-selector')
@@ -387,6 +459,7 @@ function getAudioPlayers() {
 
 let loopMode = false
 let sustainMode = true
+let pianoMode = false
 
 function getButtonPlayTimeBackground(playTimeAmount: number) {
     return `linear-gradient(to right, #8c7099aa ${playTimeAmount * 100}%, #8c709945 ${playTimeAmount * 100}%)`
@@ -448,6 +521,8 @@ async function updateDankness(dankSlider: Slider) {
     audioEffects.setDankness(dankSlider.value)
 }
 
+let pianoBufferRef = new AsyncValue<AudioBuffer>()
+
 async function createAudioButton(name: string, category: string, index: number) {
     const buttonElement = document.createElement('button')
     buttonElement.className = 'audio-button'
@@ -474,7 +549,11 @@ async function createAudioButton(name: string, category: string, index: number) 
             const buffer = audioBuffer.getChannelData(i)
             const sampleDuration = 0.1
             const targetVolume = 0
-            audio.normalize(buffer, targetVolume, audioBuffer.sampleRate * sampleDuration)
+            normalize_audio(buffer, targetVolume, audioBuffer.sampleRate * sampleDuration)
+        }
+
+        if (name === 'Airhorn') {
+            pianoBufferRef.set(audioBuffer)
         }
 
         audioControl.setAudioBuffer(audioBuffer)
@@ -624,6 +703,18 @@ function toggleSustainMode() {
     })
 }
 
+function togglePianoMode() {
+    doAsync(async () => {
+        const button = await pianoModeRef.get()
+        pianoMode = !pianoMode
+        if (pianoMode) {
+            button.setAttribute('active', 'active')
+        } else {
+            button.removeAttribute('active')
+        }
+    })
+}
+
 type BindValue
 = string
 | ((e: KeyboardEvent) => void)
@@ -710,15 +801,14 @@ async function start() {
     }
 
     const loopModeButton = await loopModeRef.get()
-    loopModeButton.onclick = () => {
-        toggleLoopMode()
-    }
+    loopModeButton.onclick = toggleLoopMode
 
     const sustainModeButton = await sustainModeRef.get()
     sustainModeButton.setAttribute('active', 'active')
-    sustainModeButton.onclick = () => {
-        toggleSustainMode()
-    }
+    sustainModeButton.onclick = toggleSustainMode
+
+    const pianoModeButton = await pianoModeRef.get()
+    pianoModeButton.onclick = togglePianoMode
 
     const recordingBankContainer = await recordingBankContainerRef.get()
 
@@ -801,35 +891,37 @@ async function start() {
 
     keyBinds = {
         'KeyQ': ['Laugh Track', 'Windows 95 Error'],
+        'KeyW': ['Youre dead', 'Wow'],
+        'KeyE': 'Eww',
+        'KeyR': ['Thats how it flows', 'Ring ring the schoolbell'],
+        'KeyT': ['bark4me', 'Bitches'],
+        'KeyY': ['Not alright', 'This is democracy manifest'],
+        'KeyU': ['That must be super fucking hard for you', 'Im gay'],
+        'KeyI': ['Yes', 'Vereena'],
+        'KeyO': ['OBAMNA', 'Oh no Sam Seder'],
         'KeyP': ['Police Siren 1', 'Call a crackhead'],
         'BracketLeft': 'Police Siren 2',
         'BracketRight': ['Im calling the cop', 'What is the charge'],
+
         'KeyA': 'Gun shot 1',
-        'KeyL': 'Quack',
-        'KeyH': ['Headshot', 'Hello there'],
-        'KeyN': ['Nononononono', 'No'],
-        'KeyT': ['bark4me', 'Bitches'],
-        'Semicolon': ['Hawnk', 'Airhorn',],
-        'KeyM': ['Stop it get some help', 'Murder is legal'],
-        'KeyX': ['STOP', 'STOP THE HAMMERING'],
-        'KeyO': ['OBAMNA', 'Oh no Sam Seder'],
-        'KeyB': ['Bwah', 'Breasts'],
-        'KeyD': 'Bye bye',
-        'KeyU': ['That must be super fucking hard for you', 'Im gay'],
-        'KeyV': ['Very unfair', 'Its very sad'],
-        'KeyZ': 'We Love You',
-        'KeyJ': 'What rules',
-        'KeyC': ['jermaThing', 'Crap'],
         'KeyS': ['Oof', 'Get your hand off my penis'],
-        'KeyR': ['Thats how it flows', 'Ring ring the schoolbell'],
+        'KeyD': ['Bye bye', 'Do not come'],
         'KeyF': 'Dinosaurs are ours',
-        'KeyK': ['Youre being a Karen', 'My favorite big booty Latina'],
         'KeyG': ['GAS', 'Thats when I pull out my gun'],
-        'KeyW': ['Youre dead', 'What an idiot'],
-        'KeyE': 'Eww',
-        'KeyI': ['Yes', 'Vereena'],
-        'KeyY': ['Not alright', 'This is democracy manifest'],
+        'KeyH': ['TS Hey wake up', 'Hello there'],
+        'KeyJ': 'What rules',
+        'KeyK': ['Youre being a Karen', 'My favorite big booty Latina'],
+        'KeyL': 'Quack',
+        'Semicolon': ['Hawnk', 'Airhorn',],
+        'KeyZ': ['We Love You', 'Im gonna come'],
+        'KeyX': ['STOP', 'STOP THE HAMMERING'],
+        'KeyC': ['jermaThing', 'Crap'],
+        'KeyV': ['Very unfair', 'Its very sad'],
+        'KeyB': ['Bwah', 'Breasts'],
+        'KeyN': ['Nononononono', 'No'],
+        'KeyM': ['Stop it get some help', 'Murder is legal'],
         'Comma': 'Exploding Milk Porn',
+        'Period': ['Im a human and im comin', 'Im a pioneer'],
 
         'Digit1': recorders[0],
         'Digit2': recorders[1],
@@ -867,8 +959,13 @@ async function start() {
 
     const dropzone = document.getElementById('dropzone')!
     
-    addEventListener('keydown', event => {
-        if (event.code === 'F' && event.ctrlKey) {
+    addEventListener('keydown', async event => {
+        if (pianoMode) {
+            pianoControls.handleKeyDown(event)
+            return
+        }
+
+        if (event.code === 'KeyF' && event.ctrlKey) {
             event.preventDefault()
             // openSearch()
             return
@@ -926,6 +1023,10 @@ async function start() {
     })
 
     addEventListener('keyup', event => {
+        if (pianoMode) {
+            pianoControls.handleKeyUp(event)
+            return
+        }
         if (overrideKeyBinds) {
             return
         }
@@ -1050,13 +1151,18 @@ async function start() {
     const nodeTypeSelector = new NodeTypeSelector(await nodeTypeSelectorRef.get())
     const nodeControls = new NodeControls(nodeTypeSelector, globalAudioContext, await guiCanvasRef.get())
 
-    
-
     console.log('awaiting sounds to load')
+    let t0 = Date.now()
 
     await soundPromise
 
-    console.log(`${audioControls.length} sounds loaded`)
+    // let pianoBuffer = await pianoBufferRef.get()
+    let pianoBuffer = audio.generateSineWave(globalAudioContext, 440, 1)
+    let pianoControls = createPianoControls(pianoBuffer, globalAudioContext, audioEffects.inputNode)
+
+    let t1 = Date.now()
+
+    console.log(`${audioControls.length} sounds loaded in ${t1 - t0}ms.`)
 }
 
 start()

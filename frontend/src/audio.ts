@@ -1,4 +1,4 @@
-import { chunkFloat32, count, Dictionary, flatMap, flatten, map, max, product, relerp } from "./util"
+import { chunkFloat32, count, Dictionary, doAsync, flatMap, flatten, map, max, product, relerp, sleep } from "./util"
 
 export namespace audio {
     export async function load(path: string, audioContext: AudioContext): Promise<AudioBuffer> {
@@ -446,7 +446,7 @@ export namespace audio {
         currentlyPlaying: boolean = false
         startTime: number = 0
         private requestPlayAfterStop: boolean = false
-        private audioSource: AudioBufferSourceNode | undefined
+        protected audioSource: AudioBufferSourceNode | undefined
         private detuneValue: number = 1
         protected readonly output: AudioNode
         private loopModeProp = false
@@ -541,6 +541,59 @@ export namespace audio {
         }
     }
 
+    export class BasicAudioBufferSourcePlayer extends AudioBufferSourcePlayer {
+        private readonly audioContext: AudioContext
+        private readonly audioBuffer: AudioBuffer
+        private attackTime: number = 0.1
+        private releaseTime: number = 0.1
+
+        constructor(audioContext: AudioContext, audioBuffer: AudioBuffer, output: AudioNode) {
+            super(output)
+            this.audioContext = audioContext
+            this.audioBuffer = audioBuffer
+        }
+
+        play() {
+            super.play()
+            const gainNode = this.audioContext.createGain()
+            gainNode.gain.setValueAtTime(0, this.audioContext.currentTime)
+            gainNode.gain.linearRampToValueAtTime(1, this.audioContext.currentTime + this.attackTime)
+            this.output.connect(gainNode)
+            gainNode.connect(this.audioContext.destination)
+            this.audioSource?.addEventListener('ended', event => {
+                gainNode.addEventListener('ended', event => {
+                    gainNode.disconnect()
+                })
+            })
+        }
+
+        stop() {
+            const gainNode = this.audioContext.createGain()
+            gainNode.gain.setValueAtTime(1, this.audioContext.currentTime)
+            gainNode.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + this.releaseTime)
+            this.output.connect(gainNode)
+            gainNode.connect(this.audioContext.destination)
+            gainNode.addEventListener('ended', event => {
+                gainNode.disconnect()
+            })
+
+            let stop = () => super.stop()
+
+            doAsync(async () => {
+                await sleep(this.releaseTime * 1000)
+                stop()
+            })
+        }
+
+        getAudioContext() {
+            return this.audioContext
+        }
+
+        getAudioBuffer() {
+            return this.audioBuffer
+        }
+    }
+
     export class AudioControl extends AudioBufferSourcePlayer {
         readonly buttonElement: HTMLButtonElement
         readonly audioContext: AudioContext
@@ -580,6 +633,59 @@ export namespace audio {
 
         isAudioInitialized() {
             return this.audioInitialized
+        }
+    }
+
+    export class MultiVoicePlayer implements AudioPlayer {
+        private readonly audioPlayers: AudioBufferSourcePlayer[]
+        private readonly output: AudioNode
+        private readonly loopModeProp: boolean
+        private selectedVoiceIndex = 0
+
+        constructor(audioPlayers: AudioBufferSourcePlayer[], output: AudioNode, loopMode: boolean) {
+            this.audioPlayers = audioPlayers
+            this.output = output
+            this.loopModeProp = loopMode
+        }
+
+        get loopMode(): boolean {
+            return this.loopModeProp
+        }
+
+        set loopMode(loopMode: boolean) {
+            this.audioPlayers.forEach(audioPlayer => audioPlayer.loopMode = loopMode)
+        }
+
+        getOutput() {
+            return this.output
+        }
+
+        selectVoice(voiceIndex: number) {
+            this.selectedVoiceIndex = voiceIndex
+        }
+
+        play(): void {
+            this.audioPlayers[this.selectedVoiceIndex].play()
+        }
+
+        stop(): void {
+            this.audioPlayers.forEach(audioPlayer => audioPlayer.stop())
+        }
+
+        detune(pitchMultiplier: number) {
+            this.audioPlayers.forEach(audioPlayer => audioPlayer.detune(pitchMultiplier))
+        }
+
+        getDuration() {
+            return this.audioPlayers[0].getDuration()
+        }
+
+        getElapsedTime() {
+            return this.audioPlayers[0].getElapsedTime()
+        }
+
+        get currentlyPlaying(): boolean {
+            return this.audioPlayers.some(audioPlayer => audioPlayer.currentlyPlaying)
         }
     }
 
@@ -633,92 +739,6 @@ export namespace audio {
         }
     }
 
-    export function modifyWaveformPower(buffer: Float32Array, target: number, subSampleLength: number) {
-        const length = buffer.length
-        // const power = waveformPower(buffer)
-        const power = getPeakWaveformPower(buffer, subSampleLength)
-        const powerRatio = target / power
-
-        for (let i = 0; i < length; i++) {
-            buffer[i] *= powerRatio
-        }
-    }
-
-    export function getPeakWaveformPower(buffer: Float32Array, subSampleLength: number) {
-        const chunkCount = Math.floor(buffer.length / subSampleLength)
-        let peak = 0
-
-        for (let i = 0; i < chunkCount; i++) {
-            const power = getWaveformPower(buffer, subSampleLength * i, subSampleLength)
-
-            if (power > peak) {
-                peak = power
-            }
-        }
-
-        return peak
-    }
-
-    export function getWaveformPower(buffer: Float32Array, offset: number, length: number) {
-        let sum = 0
-        let previousSample = 0
-        const endOffset = offset + length
-        for (let i = offset; i < endOffset; i++) {
-            const sample = buffer[i]
-            sum += Math.abs(sample - previousSample)
-            previousSample = sample
-        }
-        return sum / length
-    }
-
-    export function normalize(buffer: Float32Array, targetLevel: number, windowLength: number) {
-        const rms = getPeakRMS(buffer, targetLevel, 0, buffer.length, windowLength)
-        for (let i = 0; i < buffer.length; i++) {
-            buffer[i] *= rms
-        }
-    }
-
-    export function getPeakRMS(buffer: Float32Array, targetLevel: number, offset: number, length: number, windowLength: number) {
-        if (windowLength > length - offset) {
-            windowLength = length - offset
-        }
-
-        const r = 10 ** (targetLevel / 10)
-
-        let sumSquares = 0
-        
-        for (let i = offset; i < offset + windowLength; i++) {
-            sumSquares += buffer[i] ** 2
-        }
-
-        let peakSumSquares = sumSquares
-
-        for (let slidingOffset = offset + 1; slidingOffset < length - windowLength; slidingOffset++) {
-            sumSquares -= buffer[slidingOffset - 1] ** 2
-            sumSquares += buffer[slidingOffset + windowLength] ** 2
-
-            if (sumSquares > peakSumSquares) {
-                peakSumSquares = sumSquares
-            }
-        }
-
-        return Math.sqrt((windowLength * r ** 2) / peakSumSquares)
-    }
-
-    export function getRMS(buffer: Float32Array, targetLevel: number, offset: number, length: number) {
-        const r = 10 ** (targetLevel / 10)
-        return Math.sqrt((length * r ** 2) / sumOfSquares(buffer, offset, length))
-    }
-
-    export function sumOfSquares(buffer: Float32Array, offset: number, length: number) {
-        let sum = 0
-        const endOffset = offset + length
-        for (let i = offset; i < endOffset; i++) {
-            sum += buffer[i] ** 2
-        }
-        return sum
-    }
-
     export class AudioDevices {
         private mediaStream: MediaStream | undefined
         private mediaStreamPromise: Promise<MediaStream>
@@ -734,5 +754,18 @@ export namespace audio {
 
             return this.mediaStream
         }
+    }
+
+    export function generateSineWave(context: AudioContext, frequency: number, duration: number) {
+        const sampleRate = context.sampleRate
+        const length = sampleRate * duration
+        const audioBuffer = context.createBuffer(1, length, sampleRate)
+        const channelData = audioBuffer.getChannelData(0)
+
+        for (let i = 0; i < length; i++) {
+            channelData[i] = Math.sin(2 * Math.PI * frequency * i / sampleRate)
+        }
+
+        return audioBuffer
     }
 }

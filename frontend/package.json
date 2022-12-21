@@ -2,6 +2,9 @@
   "scripts": {
     "build": "webpack"
   },
+  "dependencies": {
+    "soundboard-wasm": "file:./soundboard-wasm/pkg"
+  },
   "devDependencies": {
     "@types/offscreencanvas": "^2019.7.0",
     "ts-loader": "^9.3.1",

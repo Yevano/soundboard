@@ -1,3 +1,4 @@
+import { normalize_audio } from "soundboard-wasm"
 import { audio } from "./audio"
 import { drawWaveform } from "./canvas"
 import { getRecordingEntries, setRecordingEntries } from "./store"
@@ -44,7 +45,7 @@ export class Recorder extends audio.AudioBufferSourcePlayer {
             const buffer = audioBuffer.getChannelData(i)
             const sampleDuration = 0.1
             const targetVolume = 0
-            audio.normalize(buffer, targetVolume, audioBuffer.sampleRate * sampleDuration)
+            normalize_audio(buffer, targetVolume, audioBuffer.sampleRate * sampleDuration)
         }
         this.setWaveformImage()
     }
@@ -130,9 +131,11 @@ export class Recorder extends audio.AudioBufferSourcePlayer {
             }
         }
 
-        if (startOffset !== 0) {
-            startOffset--
+        if (startOffset === 0) {
+            return
         }
+
+        startOffset--
 
         console.log(`${startOffset} / ${length}`)
         const newBufferLength = length - startOffset

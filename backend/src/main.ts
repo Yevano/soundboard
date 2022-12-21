@@ -76,6 +76,7 @@ app.get('/get-audio/:name', async (req, res) => {
     const absolutePath = path.resolve(`${audioDirPath}/${audioFileName}`)
     console.log(`Send file: ${absolutePath}`)
     res.sendFile(absolutePath)
+    res.setHeader('Access-Control-Allow-Origin', '*')
 })
 
 app.post('/put-audio/:name', storeAudio.single('recording'), async (req, res) => {
